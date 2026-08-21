@@ -22,7 +22,7 @@ Because Baileys is absent from the repository, everything here is pinned against
 
 ## Connection
 
-The provider owns one connection's lifecycle. It opens eagerly when the plugin loads and reports progress through `status()` and `whatsapp/status`: `connecting`, then `pairing` carrying the QR payload a human scans, then `online` with the account id. An unexpected close reopens after `reconnectDelay` until `maxReconnectAttempts` consecutive attempts are spent, after which the provider stops and reports `WHATSAPP_RECONNECT_EXHAUSTED`. A logged-out close is terminal: the credentials are dead, so it becomes `logged-out` without retrying.
+The provider owns one connection's lifecycle. It opens eagerly when the plugin loads and reports progress through `status()` and `whatsapp/status`: `connecting`, then `pairing` carrying the QR payload a human scans, then `online` naming the account. Baileys reports the address of the linked *device*, whose `:<device>` suffix changes each time the same account pairs again, so the suffix is dropped and the id names the account; a connection that reports no address leaves `accountId` absent rather than carrying a placeholder. An unexpected close reopens after `reconnectDelay` until `maxReconnectAttempts` consecutive attempts are spent, after which the provider stops and reports `WHATSAPP_RECONNECT_EXHAUSTED`. A logged-out close is terminal: the credentials are dead, so it becomes `logged-out` without retrying.
 
 Teardown is LIFO — the connection closes before the registration is withdrawn, so nothing dispatches onto a closing socket.
 

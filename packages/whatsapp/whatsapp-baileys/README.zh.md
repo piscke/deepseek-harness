@@ -22,7 +22,7 @@ pnpm add baileys   # in the deployment, not in this repository
 
 ## 连接
 
-provider 拥有一条连接的生命周期。它在插件加载时立即打开，并通过 `status()` 与 `whatsapp/status` 上报进展：先 `connecting`，再是携带人工扫描 QR 负载的 `pairing`，随后是带账号 id 的 `online`。意外关闭会在 `reconnectDelay` 之后重开，直到连续 `maxReconnectAttempts` 次尝试耗尽，此后 provider 停止并报告 `WHATSAPP_RECONNECT_EXHAUSTED`。已登出导致的关闭是终止性的：凭据已失效，因此直接进入 `logged-out` 而不重试。
+provider 拥有一条连接的生命周期。它在插件加载时立即打开，并通过 `status()` 与 `whatsapp/status` 上报进展：先 `connecting`，再是携带人工扫描 QR 负载的 `pairing`，随后是指明账号的 `online`。Baileys 上报的是所链接**设备**的地址，其 `:<device>` 后缀在同一账号每次重新配对时都会改变，因此该后缀被去掉，使这个 id 指向账号本身；若某次连接根本没有上报地址，则 `accountId` 保持缺席，而不是携带一个占位值。意外关闭会在 `reconnectDelay` 之后重开，直到连续 `maxReconnectAttempts` 次尝试耗尽，此后 provider 停止并报告 `WHATSAPP_RECONNECT_EXHAUSTED`。已登出导致的关闭是终止性的：凭据已失效，因此直接进入 `logged-out` 而不重试。
 
 拆解顺序为 LIFO —— 连接先于注册被撤回而关闭，因此不会有任何调用派发到正在关闭的 socket 上。
 
