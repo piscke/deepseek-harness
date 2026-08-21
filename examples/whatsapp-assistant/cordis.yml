@@ -1,0 +1,42 @@
+# Opt-in WhatsApp assistant over the shipped Web composition: the capability
+# seam, one Baileys connection, the Workspace router, and the model-facing
+# tools. The Web surface already owns the approval prompt and the Workspace
+# sidebar, so this overlay adds no UI of its own.
+#
+#   dsh web --patch examples/whatsapp-assistant/cordis.yml
+#
+# Baileys is installed by the OPERATOR, outside this workspace, and must not be
+# added to any manifest here: it reaches a GPL-3.0 package resolved from git,
+# which this MIT repository's pnpm policy rejects outright. Name that install
+# through DSH_WHATSAPP_BAILEYS; without it the provider reports
+# WHATSAPP_BAILEYS_MISSING and every account operation fails.
+#
+# This composition sends personal conversations to the LLM provider and writes
+# them to the session log. It is as sensitive as the phone it links to.
+
+- insert:
+    - id: whatsapp
+      name: '@deepseek-ai/dsh-whatsapp'
+
+    # WhatsApp replaces an existing linked device, so a second process opening
+    # these credentials closes the first with a `conflict` stream error. Pinning
+    # the directory under the harness home instead of the provider's
+    # cwd-relative default makes "one connection per account" the same rule as
+    # "one `dsh web` per DSH_HOME", which an operator can actually check.
+    - id: whatsapp-baileys
+      name: '@deepseek-ai/dsh-whatsapp-baileys'
+      config:
+        moduleSpecifier: !!js process.env.DSH_WHATSAPP_BAILEYS ?? 'baileys'
+        authDir: !!js dshHomePath('whatsapp', 'auth')
+
+    - id: whatsapp-workspace
+      name: '@deepseek-ai/dsh-whatsapp-workspace'
+      config:
+        route: category
+
+    # A host-plane row rather than a preset row: the Web profile mounts
+    # model-facing tools behind agent presets, and a scoped registration
+    # shadows a global one rather than hiding it, so registering here reaches
+    # whichever preset each session happens to run.
+    - id: tool-whatsapp
+      name: '@deepseek-ai/dsh-tool-whatsapp'

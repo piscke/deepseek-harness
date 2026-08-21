@@ -294,12 +294,24 @@ importers:
       '@deepseek-ai/dsh-tool-web':
         specifier: workspace:^
         version: link:../../packages/web/tool-web
+      '@deepseek-ai/dsh-tool-whatsapp':
+        specifier: workspace:^
+        version: link:../../packages/whatsapp/tool-whatsapp
       '@deepseek-ai/dsh-tool-workflow':
         specifier: workspace:^
         version: link:../../packages/workflow/tool-workflow
       '@deepseek-ai/dsh-web-app':
         specifier: workspace:^
         version: link:../../packages/bundle/web-app
+      '@deepseek-ai/dsh-whatsapp':
+        specifier: workspace:^
+        version: link:../../packages/whatsapp/whatsapp
+      '@deepseek-ai/dsh-whatsapp-baileys':
+        specifier: workspace:^
+        version: link:../../packages/whatsapp/whatsapp-baileys
+      '@deepseek-ai/dsh-whatsapp-workspace':
+        specifier: workspace:^
+        version: link:../../packages/whatsapp/whatsapp-workspace
       '@deepseek-ai/dsh-workflow-worker-thread':
         specifier: workspace:^
         version: link:../../packages/workflow/workflow-worker-thread
