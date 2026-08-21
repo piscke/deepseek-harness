@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-21-whatsapp-chat-id-opacity.md
-2026-08-21-whatsapp-chat-id-opacity.md: 0e471334bb6465382e24c77e43c504a23f298086
-2026-08-21-whatsapp-chat-id-opacity.zh.md: 5c629bcb16e131bd9e1cf904ba812c97d2977cca
+2026-08-21-whatsapp-chat-id-opacity.md: 39d5b5a3c38b967ba13ca6e36d72c7569398262f
+2026-08-21-whatsapp-chat-id-opacity.zh.md: de4890301d9bf9058efe445ce375dee3354b5fe2

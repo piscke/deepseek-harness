@@ -32,7 +32,9 @@ Baileys 在每次凭据更新时就地重写 `creds.json`，因此进程在写�
 
 ## 对话
 
-Baileys 不提供 message store，因此 `listChats` 与 `fetchMessages` 只回答**本连接自加载以来观察到的内容**：重启会丢弃索引，随后随消息到达而增长。它在连接时并不必然为空，因为 WhatsApp 会在握手期间重放离线流量。`listChats` 按最新观察到的消息排序；`fetchMessages` 返回最新在前，并用 `before` 翻页。本连接从未观察过的对话失败于 `WHATSAPP_UNKNOWN_CHAT`，而不是返回空页，因为空页与未知地址是两个不同的答案。每个对话的保留量以 `historyPerChat` 为上限，最旧者先被逐出。
+Baileys 不提供 message store，因此 `listChats` 与 `fetchMessages` 只回答**本连接自加载以来观察到的内容**：重启会丢弃索引，随后随消息到达而增长。它在连接时并不必然为空，因为 WhatsApp 会在握手期间重放离线流量。`listChats` 按最新观察到的消息排序；`fetchMessages` 返回最新在前，并用 `before` 翻页。每个对话的保留量以 `historyPerChat` 为上限，最旧者先被逐出。
+
+索引成员资格不是前置条件。`resolveChat` 与 `fetchMessages` 会为本连接从未观察过的地址作答——给出 kind 与一个空页——只有根本不是地址的值才被拒绝，报 `WHATSAPP_UNKNOWN_CHAT`。账号可以向这样的对话发送消息并标记已读，因此拒绝读取会让热启动看起来像输错了地址；而空页是诚实的：本连接没有为该对话保留任何内容。它的名称是缺席而不是被替代，因为要向操作员展示消息去向的消费者，必须能够说出自己并不知道。
 
 除非消息带有 id、对话地址以及由人撰写的内容，否则一律丢弃。`messageContextInfo` 与 `senderKeyDistributionMessage` 描述的是投递而非内容，`protocolMessage` 属于撤回、历史同步通知一类的事务性帧；仅含这些字段的信封会被丢弃，而当它们伴随真实内容出现时会被跳过，使上报的类型指向载荷本身，而不是恰好最先解码的那个字段。seam 无法表示的媒体变为带媒体类型的 `unsupported`，使消费者仍能看到确有内容到达。
 

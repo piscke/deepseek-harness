@@ -14,7 +14,7 @@ This is the **definition** package. It owns the vocabulary, the events, and the 
 | `status()` | The account's connection state; `offline` while no provider is registered. Never throws. |
 | `listChats(signal?)` | Conversations the connected account knows about. |
 | `resolveChat(chatId, signal?)` | The conversation one address names, kind decided by the provider and named when the connection observed it. Rejects a value that names no conversation with `WHATSAPP_UNKNOWN_CHAT`. |
-| `fetchMessages(request, signal?)` | One page of a chat's history, newest first. |
+| `fetchMessages(request, signal?)` | One page of a chat's history, newest first; an address the connection never observed has no retained history and answers with an empty page. |
 | `send(request, signal?)` | Sends one text message and emits `whatsapp/message-sent` once acknowledged. |
 | `markRead(chatId, signal?)` | Marks a chat read up to its newest message. |
 

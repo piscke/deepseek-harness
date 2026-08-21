@@ -123,7 +123,12 @@ export interface WhatsAppProvider {
    * `WHATSAPP_UNKNOWN_CHAT`.
    */
   resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat>
-  /** Read one page of a chat's history, newest first; honor `signal`. */
+  /**
+   * Read one page of a chat's history, newest first; honor `signal`. An address
+   * this connection has not observed has no retained history, so it answers with
+   * an empty page; only a value that names no conversation at all is rejected,
+   * with `WHATSAPP_UNKNOWN_CHAT`.
+   */
   fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Promise<readonly WhatsAppMessage[]>
   /** Send one text message; honor `signal`. */
   send(request: WhatsAppSendRequest, signal?: AbortSignal): Promise<WhatsAppSentMessage>

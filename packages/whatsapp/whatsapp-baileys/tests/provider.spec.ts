@@ -317,10 +317,17 @@ describe('history', () => {
       .resolves.toHaveLength(3)
   })
 
-  it('refuses a chat this connection has never observed', async () => {
+  it('reads a chat this connection has never observed as an empty page', async () => {
     const scripted = await online()
-    expect(() => scripted.provider.fetchMessages({ chatId })).toThrow(WhatsAppError)
-    expect(() => scripted.provider.fetchMessages({ chatId })).toThrow(/has not been observed/)
+    await expect(scripted.provider.fetchMessages({ chatId })).resolves.toStrictEqual([])
+  })
+
+  it('refuses to read a value that names no conversation', async () => {
+    const scripted = await online()
+    expect(() => scripted.provider.fetchMessages({ chatId: WhatsAppChatId('not-an-address') }))
+      .toThrow(WhatsAppError)
+    expect(() => scripted.provider.fetchMessages({ chatId: WhatsAppChatId('not-an-address') }))
+      .toThrow(/names no WhatsApp conversation/)
   })
 
   it('resolves an observed chat with the name and unread count it recorded', async () => {

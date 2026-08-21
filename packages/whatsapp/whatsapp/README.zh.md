@@ -14,7 +14,7 @@ WhatsApp 能力 seam（`ctx.whatsapp`）：在恰好一个已认证账号之上�
 | `status()` | 账号的连接状态；未注册 provider 时为 `offline`。永不抛出。 |
 | `listChats(signal?)` | 已连接账号所知的对话。 |
 | `resolveChat(chatId, signal?)` | 一个地址所指的对话；类型由 provider 判定，连接观察到时带上名称。对不指向任何对话的值以 `WHATSAPP_UNKNOWN_CHAT` 拒绝。 |
-| `fetchMessages(request, signal?)` | 某个对话历史的一页，最新在前。 |
+| `fetchMessages(request, signal?)` | 某个对话历史的一页，最新在前；连接从未观察过的地址没有保留历史，返回空页。 |
 | `send(request, signal?)` | 发送一条文本消息，并在被确认后发出 `whatsapp/message-sent`。 |
 | `markRead(chatId, signal?)` | 将对话标记为已读至其最新消息。 |
 

@@ -115,13 +115,7 @@ export class BaileysProvider implements WhatsAppProvider {
     signal?.throwIfAborted()
     const record = this.chats.get(chatId)
     if (record !== undefined) return Promise.resolve(record.chat)
-    const [user, domain] = chatId.split('@')
-    if (user === undefined || user === '' || domain === undefined || domain === '') {
-      throw new WhatsAppError(
-        `"${chatId}" names no WhatsApp conversation; an address is a user and a domain, such as <number>@s.whatsapp.net`,
-        'WHATSAPP_UNKNOWN_CHAT',
-      )
-    }
+    assertAddressable(chatId)
     return Promise.resolve({ id: chatId, kind: chatKindOf(chatId), unreadCount: 0 })
   }
 
@@ -129,10 +123,10 @@ export class BaileysProvider implements WhatsAppProvider {
     signal?.throwIfAborted()
     const record = this.chats.get(request.chatId)
     if (record === undefined) {
-      throw new WhatsAppError(
-        `chat "${request.chatId}" has not been observed by this connection`,
-        'WHATSAPP_UNKNOWN_CHAT',
-      )
+      // An unobserved address is a conversation with no retained history rather
+      // than a bad request; the account can still send to it and mark it read.
+      assertAddressable(request.chatId)
+      return Promise.resolve([])
     }
     const newestFirst = [...record.messages].reverse()
     const from = request.before === undefined ? 0 : indexAfter(newestFirst, request.before)
@@ -274,6 +268,24 @@ export class BaileysProvider implements WhatsAppProvider {
     if (sameStatus(this.state, status)) return
     this.state = status
     this.deps.onStatus(status)
+  }
+}
+
+/**
+ * Reject a value that names no conversation at all.
+ *
+ * Every domain is accepted, because WhatsApp owns that set and extends it; only
+ * a value missing a user or a domain is refused, which is the one judgment that
+ * does not go stale.
+ * @param chatId - the conversation address to check.
+ */
+function assertAddressable(chatId: WhatsAppChatId): void {
+  const [user, domain] = chatId.split('@')
+  if (user === undefined || user === '' || domain === undefined || domain === '') {
+    throw new WhatsAppError(
+      `"${chatId}" names no WhatsApp conversation; an address is a user and a domain, such as <number>@s.whatsapp.net`,
+      'WHATSAPP_UNKNOWN_CHAT',
+    )
   }
 }
 
