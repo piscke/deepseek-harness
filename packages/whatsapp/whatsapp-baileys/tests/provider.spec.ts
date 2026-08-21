@@ -225,6 +225,16 @@ describe('reconnection', () => {
     expect(scripted.pendingTimers).toBe(0)
     expect(scripted.provider.available()).toBe(false)
   })
+
+  it('does not retry damaged credentials, and reports the state whose remedy is pairing again', async () => {
+    const damaged = new WhatsAppError('creds.json is damaged', 'WHATSAPP_AUTH_STATE_DAMAGED')
+    const scripted = rig({ openFails: () => damaged })
+    await scripted.provider.start()
+    expect(scripted.fatals).toEqual([damaged])
+    expect(scripted.pendingTimers).toBe(0)
+    expect(scripted.provider.status()).toEqual({ state: 'logged-out', reason: 'creds.json is damaged' })
+    expect(scripted.provider.available()).toBe(false)
+  })
 })
 
 describe('observed conversations', () => {

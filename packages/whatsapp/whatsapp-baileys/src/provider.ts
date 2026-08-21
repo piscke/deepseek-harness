@@ -167,11 +167,17 @@ export class BaileysProvider implements WhatsAppProvider {
     try {
       this.socket = await this.deps.open((event) => { this.handle(event) })
     } catch (cause) {
+      const code = cause instanceof WhatsAppError ? cause.code : undefined
+      // Damaged credentials are terminal for the same reason WhatsApp's own
+      // logout is, so the operator sees the state whose remedy is to pair again
+      // rather than an `offline` indistinguishable from a dropped network.
+      if (code === 'WHATSAPP_AUTH_STATE_DAMAGED') {
+        this.setStatus({ state: 'logged-out', reason: (cause as WhatsAppError).message })
+        this.fail(cause)
+        return
+      }
       this.setStatus({ state: 'offline' })
-      // A connection that cannot even be opened is either a missing peer,
-      // which no retry can install, or unreachable infrastructure, which the
-      // reconnection policy already bounds.
-      if (cause instanceof WhatsAppError && cause.code === 'WHATSAPP_BAILEYS_MISSING') {
+      if (code === 'WHATSAPP_BAILEYS_MISSING') {
         this.fail(cause)
         return
       }

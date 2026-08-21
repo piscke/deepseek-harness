@@ -14,7 +14,7 @@ So the failure presents as a fresh QR. An operator scans it, gets a working conn
 
 ## Decision
 
-The provider reads `creds.json` before opening the socket and refuses to connect when it exists and does not parse, reporting `WHATSAPP_AUTH_STATE_DAMAGED` and naming the file. An absent file is a first run and connects normally, so pairing is untouched.
+The provider reads `creds.json` before opening the socket and refuses to connect when it exists and does not parse, reporting `WHATSAPP_AUTH_STATE_DAMAGED` and naming the file. An absent file is a first run and connects normally, so pairing is untouched. The status becomes `logged-out` carrying that message rather than `offline`: the seam already defines `logged-out` as terminal for the current credentials with pairing as the remedy, which is exactly this situation, and `offline` would be indistinguishable from a dropped network the provider is about to retry.
 
 This does not repair anything. It converts a silent, destructive outcome — pairing abandoned, presented as a routine QR — into a loud one an operator can act on, which is the repository's rule that a misconfiguration fails at the earliest resolvable point rather than being skipped.
 
@@ -28,8 +28,10 @@ This does not repair anything. It converts a silent, destructive outcome — pai
 
 **Validate the credential contents, not just that they parse.** Tempting once a read is already there, but the field set belongs to Baileys and changes with it. Parsing is the property the harness can check without duplicating a schema it does not own, and a syntactically valid file with wrong fields fails loudly at connect anyway.
 
+**Report `offline` and let the reconnection policy handle it.** This was the first implementation, and running it against the damaged directory showed why it is wrong: the provider reopened every few seconds forever, since nothing about a truncated file heals with time, and the operator saw a status indistinguishable from a network drop. The reason a retry cannot help is the same reason `logged-out` exists.
+
 ## Consequences
 
 Recovery is manual: delete the directory and pair again. That is stated in the provider README beside the limitation, because a fail-closed error whose remedy is not written down just moves the confusion.
 
-The provider now reads from disk before delegating to Baileys, so its tests cover a real temporary directory rather than only the socket double. The two-process case remains unenforced and documented; this note is the reason a lock, when it arrives, belongs on the directory rather than around the write.
+The provider now reads from disk before delegating to Baileys, so its tests cover a real temporary directory rather than only the socket double. The behavior is confirmed against the account whose credentials were damaged: one `connecting`, then `logged-out` carrying the path, and no further attempts. The two-process case remains unenforced and documented; this note is the reason a lock, when it arrives, belongs on the directory rather than around the write.

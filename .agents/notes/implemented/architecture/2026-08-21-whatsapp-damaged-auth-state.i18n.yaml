@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-21-whatsapp-damaged-auth-state.md
-2026-08-21-whatsapp-damaged-auth-state.md: 9b7e397a8075c2442b25c9bec6352abfcf096165
-2026-08-21-whatsapp-damaged-auth-state.zh.md: 2bd1ae450a3e1da954b16f51c85f3c39147227c9
+2026-08-21-whatsapp-damaged-auth-state.md: cd1391f750d72069801e5eff75a6961944d9099a
+2026-08-21-whatsapp-damaged-auth-state.zh.md: 327bc1905ca0304d8493f49c15698cb976cf72af

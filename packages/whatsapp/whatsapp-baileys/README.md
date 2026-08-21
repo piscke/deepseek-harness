@@ -28,7 +28,7 @@ Teardown is LIFO — the connection closes before the registration is withdrawn,
 
 Auth state is a mutable multi-file directory (`authDir`), not a credential reference. It is what lets a paired account resume without a new QR scan; it grants full access to the account and must stay out of git.
 
-Baileys rewrites `creds.json` in place on every credential update, so a process killed mid-write, or two processes sharing one directory, leaves a truncated file — which Baileys itself reads as "no credentials" and answers by registering a new device, silently abandoning the pairing and orphaning its entry in the account's linked-devices list. The provider therefore refuses to connect over a credential file it cannot parse, reporting `WHATSAPP_AUTH_STATE_DAMAGED` and naming the file, so the loss is visible rather than presented as a fresh QR. Recovery is manual: delete the directory and pair again.
+Baileys rewrites `creds.json` in place on every credential update, so a process killed mid-write, or two processes sharing one directory, leaves a truncated file — which Baileys itself reads as "no credentials" and answers by registering a new device, silently abandoning the pairing and orphaning its entry in the account's linked-devices list. The provider therefore refuses to connect over a credential file it cannot parse, reporting `WHATSAPP_AUTH_STATE_DAMAGED` and naming the file, so the loss is visible rather than presented as a fresh QR. The status becomes `logged-out` carrying that message, because the remedy is the one `logged-out` already means: pair again. Reopening is not attempted; it could resolve the damage only by discarding the pairing. Recovery is manual — delete the directory and pair again.
 
 ## Conversations
 
