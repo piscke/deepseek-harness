@@ -3156,6 +3156,32 @@ export interface Config {
 
 来源：[`packages/web/web-search-perplexity/src/index.ts:32`](../packages/web/web-search-perplexity/src/index.ts)
 
+<a id="deepseek-aidsh-whatsapp-baileys"></a>
+
+## `@deepseek-ai/dsh-whatsapp-baileys`
+
+需要：`whatsapp`
+
+```ts config-catalog
+/** Plugin config: where the library and credentials live, and how the connection is kept up. */
+export interface Config {
+  /** Module specifier of the Baileys library the deployment installed. */
+  moduleSpecifier?: string
+  /** Directory holding the multi-file auth state that resumes a paired account. */
+  authDir?: string
+  /** Device name shown in WhatsApp's linked-devices list. */
+  deviceName?: string
+  /** Milliseconds to wait before reopening a connection that closed unexpectedly. */
+  reconnectDelay?: number
+  /** Consecutive reopen attempts before the provider gives up until it is reloaded. */
+  maxReconnectAttempts?: number
+  /** Messages retained per conversation for `fetchMessages`. */
+  historyPerChat?: number
+}
+```
+
+来源：[`packages/whatsapp/whatsapp-baileys/src/index.ts:46`](../packages/whatsapp/whatsapp-baileys/src/index.ts)
+
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 
 ## `@deepseek-ai/dsh-workflow-worker-thread`
@@ -3258,6 +3284,7 @@ export interface Config {
 - `@deepseek-ai/dsh-tool-cordis` — 需要 `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect`（[`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts)）
 - `@deepseek-ai/dsh-tool-subagent-control` — 需要 `tools` · `subagents`（[`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts)）
 - `@deepseek-ai/dsh-user-questions`（[`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts)）
+- `@deepseek-ai/dsh-whatsapp`（[`packages/whatsapp/whatsapp/src/index.ts`](../packages/whatsapp/whatsapp/src/index.ts)）
 - `@deepseek-ai/dsh-workspace` — 需要 `storageDomain` · `sessionPersistence`（[`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts)）
 
 ## Seam 包（不可直接加载）

@@ -106,6 +106,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   typertGateway: 'typert.md',
   userQuestions: 'user-questions.md',
   web: 'web.md',
+  whatsapp: 'whatsapp.md',
   workflowEngine: 'workflow.md',
   workspaceRegistry: 'workspace.md',
 }
@@ -184,6 +185,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'system-prompt': 'system-prompt.md',
   'session-telemetry': 'session-telemetry.md',
   'tools': 'tools.md',
+  'whatsapp': 'whatsapp.md',
   'workflow': 'workflow.md',
 }
 
@@ -596,6 +598,14 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   WorkflowAgentEndInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
   WorkflowAgentInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
   WorkflowResultInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
+  WhatsAppChat: 'WhatsApp seam vocabulary is owned by packages/whatsapp/whatsapp/README.md',
+  WhatsAppChatId: 'WhatsApp seam vocabulary is owned by packages/whatsapp/whatsapp/README.md',
+  WhatsAppHistoryRequest: 'WhatsApp seam vocabulary is owned by packages/whatsapp/whatsapp/README.md',
+  WhatsAppMessage: 'WhatsApp seam vocabulary is owned by packages/whatsapp/whatsapp/README.md',
+  WhatsAppProvider: 'WhatsApp seam vocabulary is owned by packages/whatsapp/whatsapp/README.md',
+  WhatsAppSendRequest: 'WhatsApp seam vocabulary is owned by packages/whatsapp/whatsapp/README.md',
+  WhatsAppSentMessage: 'WhatsApp seam vocabulary is owned by packages/whatsapp/whatsapp/README.md',
+  WhatsAppStatus: 'WhatsApp seam vocabulary is owned by packages/whatsapp/whatsapp/README.md',
 }
 
 /** Repository data policy consumed by the Cordis catalog projector. */

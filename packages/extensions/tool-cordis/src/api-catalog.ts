@@ -2203,6 +2203,48 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'whatsapp',
+    summary: 'The WhatsApp access service.',
+    description: 'The WhatsApp access service. Registered as `ctx.whatsapp` (one instance per context).\n\nEvery operation resolves the provider at call time and rejects when the capability cannot run:\n\n- no provider registered → `WHATSAPP_PROVIDER_UNAVAILABLE`.\n- a registered provider whose account is not `online` → `WHATSAPP_NOT_ONLINE`.\n\nThe provider emits `whatsapp/status` and `whatsapp/message-received`; this service emits `whatsapp/message-sent` after a send it dispatched is acknowledged, so an outbound acknowledgement exists even for a provider that observes no echo of its own traffic.',
+    methods: [
+      {
+        signature: 'register(provider: WhatsAppProvider): () => void',
+        description: 'Register the sole provider. Throws WhatsAppError `WHATSAPP_PROVIDER_ALREADY_REGISTERED` while another registration is live. Returns a disposer; disposed with the calling fiber.',
+        parameters: [{ name: 'provider', description: 'the backend owning one authenticated account.' }],
+        returns: 'the disposer that unregisters the provider.',
+      },
+      {
+        signature: 'status(): WhatsAppStatus',
+        description: 'Current connection state of the registered account.',
+        parameters: [],
+        returns: 'the provider\'s state, or `offline` while no provider is registered.',
+      },
+      {
+        signature: 'async listChats(signal?: AbortSignal): Promise<readonly WhatsAppChat[]>',
+        description: 'List the conversations the connected account knows about.',
+        parameters: [{ name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the known conversations in provider order.',
+      },
+      {
+        signature: 'async fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Promise<readonly WhatsAppMessage[]>',
+        description: 'Read one page of a chat\'s history, newest first.',
+        parameters: [{ name: 'request', description: 'the chat, an optional positive-integer `limit`, and an optional paging cursor.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the page the provider retained for that chat.',
+      },
+      {
+        signature: 'async send(request: WhatsAppSendRequest, signal?: AbortSignal): Promise<WhatsAppSentMessage>',
+        description: 'Send one text message and announce the acknowledgement on `whatsapp/message-sent`. A rejected send emits nothing.',
+        parameters: [{ name: 'request', description: 'the target chat, the non-empty body, and an optional quoted message.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the acknowledged message identity and send time.',
+      },
+      {
+        signature: 'async markRead(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<void>',
+        description: 'Mark one chat read up to its newest message.',
+        parameters: [{ name: 'chatId', description: 'the conversation to mark.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+      },
+    ],
+  },
+  {
     key: 'workflowEngine',
     summary: 'Workflow Service Definition contract.',
     description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, cancellation and disposal are bounded, and disposal waits for child cleanup within that bound. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
@@ -2667,6 +2709,30 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Observe the frozen, lossless-JSON final outcome.',
     description: 'Observe the frozen, lossless-JSON final outcome. Listener failures are contained. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): keyed by `exec.agent`.',
     parameters: [{ name: 'exec', description: 'the execution object that traversed the pipeline.' }, { name: 'result', description: 'a deep-frozen snapshot of the final returned result.' }],
+  },
+  {
+    name: 'whatsapp/message-received',
+    mode: 'emit',
+    signature: '\'whatsapp/message-received\'(message: WhatsAppMessage): void',
+    summary: 'One message was observed in a chat, including messages the connected account sent from another device (`fromMe`).',
+    description: 'One message was observed in a chat, including messages the connected account sent from another device (`fromMe`). Delivery follows the provider\'s own order and repeats a message whose id was already seen when the provider replays history after a reconnection, so a consumer that must act once keeps its own processed-id set.',
+    parameters: [{ name: 'message', description: 'the observed message, normalized by the provider.' }],
+  },
+  {
+    name: 'whatsapp/message-sent',
+    mode: 'emit',
+    signature: '\'whatsapp/message-sent\'(message: WhatsAppSentMessage): void',
+    summary: 'The provider acknowledged one send requested through `ctx.whatsapp`.',
+    description: 'The provider acknowledged one send requested through `ctx.whatsapp`. Acknowledgement means WhatsApp accepted the message, not that it reached or was read by the recipient.',
+    parameters: [{ name: 'message', description: 'the acknowledged message identity and send time.' }],
+  },
+  {
+    name: 'whatsapp/status',
+    mode: 'emit',
+    signature: '\'whatsapp/status\'(status: WhatsAppStatus): void',
+    summary: 'The account\'s connection state changed, emitted once per transition.',
+    description: 'The account\'s connection state changed, emitted once per transition. A `pairing` state is re-emitted whenever the provider rotates its payload, so a display always renders the latest one.',
+    parameters: [{ name: 'status', description: 'the state just entered.' }],
   },
   {
     name: 'workflow/agent-end',
@@ -4783,6 +4849,50 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WebUpgradeRoute',
     declaration: 'export interface WebUpgradeRoute {\n    path: string;\n    handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void | Promise<void>;\n}',
+  },
+  {
+    name: 'WhatsAppChat',
+    declaration: 'export interface WhatsAppChat {\n    readonly id: WhatsAppChatId;\n    readonly kind: WhatsAppChatKind;\n    readonly name?: string;\n    readonly unreadCount: number;\n}',
+  },
+  {
+    name: 'WhatsAppChatId',
+    declaration: 'export type WhatsAppChatId = Branded<\'WhatsAppChatId\'>;',
+  },
+  {
+    name: 'WhatsAppChatKind',
+    declaration: 'export type WhatsAppChatKind = \'direct\' | \'group\';',
+  },
+  {
+    name: 'WhatsAppContent',
+    declaration: 'export type WhatsAppContent = {\n    readonly kind: \'text\';\n    readonly text: string;\n} | {\n    readonly kind: \'unsupported\';\n    readonly mediaType: string;\n};',
+  },
+  {
+    name: 'WhatsAppHistoryRequest',
+    declaration: 'export interface WhatsAppHistoryRequest {\n    readonly chatId: WhatsAppChatId;\n    readonly limit?: number;\n    readonly before?: WhatsAppMessageId;\n}',
+  },
+  {
+    name: 'WhatsAppMessage',
+    declaration: 'export interface WhatsAppMessage {\n    readonly id: WhatsAppMessageId;\n    readonly chatId: WhatsAppChatId;\n    readonly chatKind: WhatsAppChatKind;\n    readonly chatName?: string;\n    readonly senderId: string;\n    readonly senderName?: string;\n    readonly fromMe: boolean;\n    readonly timestamp: string;\n    readonly content: WhatsAppContent;\n}',
+  },
+  {
+    name: 'WhatsAppMessageId',
+    declaration: 'export type WhatsAppMessageId = Branded<\'WhatsAppMessageId\'>;',
+  },
+  {
+    name: 'WhatsAppProvider',
+    declaration: 'export interface WhatsAppProvider {\n    readonly id: string;\n    available(): boolean;\n    status(): WhatsAppStatus;\n    listChats(signal?: AbortSignal): Promise<readonly WhatsAppChat[]>;\n    fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Promise<readonly WhatsAppMessage[]>;\n    send(request: WhatsAppSendRequest, signal?: AbortSignal): Promise<WhatsAppSentMessage>;\n    markRead(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<void>;\n}',
+  },
+  {
+    name: 'WhatsAppSendRequest',
+    declaration: 'export interface WhatsAppSendRequest {\n    readonly chatId: WhatsAppChatId;\n    readonly text: string;\n    readonly quotedMessageId?: WhatsAppMessageId;\n}',
+  },
+  {
+    name: 'WhatsAppSentMessage',
+    declaration: 'export interface WhatsAppSentMessage {\n    readonly id: WhatsAppMessageId;\n    readonly chatId: WhatsAppChatId;\n    readonly timestamp: string;\n}',
+  },
+  {
+    name: 'WhatsAppStatus',
+    declaration: 'export type WhatsAppStatus = {\n    readonly state: \'offline\';\n} | {\n    readonly state: \'connecting\';\n} | {\n    readonly state: \'pairing\';\n    readonly qr: string;\n} | {\n    readonly state: \'online\';\n    readonly accountId: string;\n} | {\n    readonly state: \'logged-out\';\n    readonly reason: string;\n};',
   },
   {
     name: 'WorkflowAgentEndInfo',

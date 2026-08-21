@@ -1,0 +1,64 @@
+# @deepseek-ai/dsh-whatsapp-baileys
+
+[English](README.md) | 中文
+
+面向 harness [WhatsApp 能力 seam](../whatsapp/README.md)（`ctx.whatsapp`）的 `WhatsAppProvider`，由一条连接个人 WhatsApp 账号的 [Baileys](https://github.com/WhiskeySockets/Baileys) 连接支撑。
+
+这是**实现**包：它向 `ctx.whatsapp` 注册一个 provider，既不拥有该键，也不注册任何面向模型的工具。它是 function/namespace 插件（`inject: ['whatsapp']`）。
+
+## Baileys 不是依赖
+
+`baileys` 不出现在本包清单的任何字段中，安装本包也不会带来它的任何内容。Baileys 会传递依赖到 `libsignal`，后者采用 GPL-3.0 并从 git 仓库解析；本仓库是 MIT，其 pnpm 策略直接拒绝 git 解析的传递依赖（`ERR_PNPM_EXOTIC_SUBDEP`），通过可选 peer 也一样，因为 peer 仍会在安装时解析。
+
+部署方自行安装 Baileys 并通过 `moduleSpecifier` 指明它；本包在首次连接时用动态 `import()` 加载它。接受 Baileys 许可证与账号封禁风险的位置，就是那次安装。
+
+```sh
+pnpm add baileys   # in the deployment, not in this repository
+```
+
+缺少它时，连接失败于 `WHATSAPP_BAILEYS_MISSING`，provider 将自身标记为终止，并且不再尝试重连 —— 没有任何重试能安装一个包。此时 `ctx.whatsapp` 上报 `offline`，每个操作都失败于 `WHATSAPP_PROVIDER_UNAVAILABLE`。
+
+由于 Baileys 不在仓库中，这里的一切改为针对 `WhatsAppSocket` 端口固定下来：状态机、重连策略、消息规范化与对话索引都由基于 socket 替身的测试覆盖，而**与真实库的绑定从未对 WhatsApp 运行过**。请把首次真实配对当作未经测试的一步。
+
+## 连接
+
+provider 拥有一条连接的生命周期。它在插件加载时立即打开，并通过 `status()` 与 `whatsapp/status` 上报进展：先 `connecting`，再是携带人工扫描 QR 负载的 `pairing`，随后是带账号 id 的 `online`。意外关闭会在 `reconnectDelay` 之后重开，直到连续 `maxReconnectAttempts` 次尝试耗尽，此后 provider 停止并报告 `WHATSAPP_RECONNECT_EXHAUSTED`。已登出导致的关闭是终止性的：凭据已失效，因此直接进入 `logged-out` 而不重试。
+
+拆解顺序为 LIFO —— 连接先于注册被撤回而关闭，因此不会有任何调用派发到正在关闭的 socket 上。
+
+auth state 是可变的多文件目录（`authDir`），而非凭据引用。它使已配对账号无需重新扫码即可恢复；它授予对账号的完全访问权限，必须留在 git 之外。
+
+## 对话
+
+Baileys 不提供 message store，因此 `listChats` 与 `fetchMessages` 只回答**本连接自加载以来观察到的内容**：刚重启后二者都为空，并随消息到达而增长。`listChats` 按最新观察到的消息排序；`fetchMessages` 返回最新在前，并用 `before` 翻页。本连接从未观察过的对话失败于 `WHATSAPP_UNKNOWN_CHAT`，而不是返回空页，因为空页与未知地址是两个不同的答案。每个对话的保留量以 `historyPerChat` 为上限，最旧者先被逐出。
+
+没有 id、没有对话地址或没有内容的消息属于协议帧而非会话消息，会被丢弃。seam 无法表示的媒体变为带媒体类型的 `unsupported`，使消费者仍能看到确有内容到达。
+
+## Config
+
+| 键 | 默认值 | 含义 |
+|---|---|---|
+| `moduleSpecifier` | `baileys` | 部署方所安装的 Baileys 库的模块说明符。 |
+| `authDir` | `.dsh/whatsapp/auth` | 存放多文件 auth state 的目录，用于恢复已配对账号。 |
+| `deviceName` | `DeepSeek Harness` | 在 WhatsApp 已关联设备列表中显示的名称。 |
+| `reconnectDelay` | `5000` | 重开意外关闭的连接前等待的毫秒数。 |
+| `maxReconnectAttempts` | `5` | 放弃并等待插件重新加载之前的连续重开尝试次数。 |
+| `historyPerChat` | `200` | 每个对话为 `fetchMessages` 保留的消息数。 |
+
+`reconnectDelay` 与 `historyPerChat` 必须是正的有限数，`maxReconnectAttempts` 必须是非负整数（`0` 确实表示“永不重连”）；无效值会在插件构造时抛出，而不是产出一个静默永不重连的 provider。
+
+## 模型体验
+
+通过把这些对话呈现给模型的消费者间接影响；本包不注册任何工具、提示词或 schema，而这样的消费者会把私人消息发送给 LLM 供应商并写入会话日志。
+
+#### KV Cache 影响
+
+不会直接导致 KV Cache 失效；请求前缀变更由消费方负责。
+
+## 已知限制与暂缓事项
+
+- **Baileys 绑定未针对真实库验证** —— 每个测试都驱动 socket 替身，也未进行过真实配对。该库为非官方逆向工程实现，WhatsApp 可能随时封禁号码或使客户端失效；请使用专用测试号码。
+- **历史仅存在于进程内** —— 重启会丢失对话索引，重连时的历史回放会重复消费者已见过的消息 id。必须只处理一次的消费者要自行保存已处理 id 集合。
+- **群名在被观察到之前缺失** —— 对话显示名派生自入站直聊消息上的 `pushName`，因此群主题在连接观察到之前一直无法解析。
+- **仅文本、无在线状态** —— 发送媒体、下载媒体、输入指示与送达回执均属推迟的工作。
+- **`unreadCount` 统计的是本连接观察到的内容**，而非 WhatsApp 自身的未读状态；`markRead` 在账号上清除未读，而不是在本索引中清除。

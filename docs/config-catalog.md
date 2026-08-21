@@ -3154,6 +3154,32 @@ export interface Config {
 
 Source: [`packages/web/web-search-perplexity/src/index.ts:32`](../packages/web/web-search-perplexity/src/index.ts)
 
+<a id="deepseek-aidsh-whatsapp-baileys"></a>
+
+## `@deepseek-ai/dsh-whatsapp-baileys`
+
+Requires: `whatsapp`
+
+```ts config-catalog
+/** Plugin config: where the library and credentials live, and how the connection is kept up. */
+export interface Config {
+  /** Module specifier of the Baileys library the deployment installed. */
+  moduleSpecifier?: string
+  /** Directory holding the multi-file auth state that resumes a paired account. */
+  authDir?: string
+  /** Device name shown in WhatsApp's linked-devices list. */
+  deviceName?: string
+  /** Milliseconds to wait before reopening a connection that closed unexpectedly. */
+  reconnectDelay?: number
+  /** Consecutive reopen attempts before the provider gives up until it is reloaded. */
+  maxReconnectAttempts?: number
+  /** Messages retained per conversation for `fetchMessages`. */
+  historyPerChat?: number
+}
+```
+
+Source: [`packages/whatsapp/whatsapp-baileys/src/index.ts:46`](../packages/whatsapp/whatsapp-baileys/src/index.ts)
+
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 
 ## `@deepseek-ai/dsh-workflow-worker-thread`
@@ -3256,6 +3282,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-tool-cordis` — requires `tools` · `systemPrompt` · `dynamicCordisRunner` · `cordisInspect` ([`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts))
 - `@deepseek-ai/dsh-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@deepseek-ai/dsh-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
+- `@deepseek-ai/dsh-whatsapp` ([`packages/whatsapp/whatsapp/src/index.ts`](../packages/whatsapp/whatsapp/src/index.ts))
 - `@deepseek-ai/dsh-workspace` — requires `storageDomain` · `sessionPersistence` ([`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts))
 
 ## Seam packages (not directly loadable)

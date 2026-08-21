@@ -505,6 +505,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names.',
   },
   {
+    key: 'whatsapp',
+    pkg: 'whatsapp',
+    title: 'WhatsApp account seam',
+    mode: 'seam',
+    implementations: ['whatsapp-baileys'],
+    consumers: [],
+    note: 'One registration owns one authenticated account, so the slot holds a single provider and status is part of the capability; no model-facing consumer ships yet.',
+  },
+  {
     key: 'spillStore',
     pkg: 'spill',
     title: 'Spill storage seam',

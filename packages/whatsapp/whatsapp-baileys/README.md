@@ -1,0 +1,64 @@
+# @deepseek-ai/dsh-whatsapp-baileys
+
+English | [中文](README.zh.md)
+
+A `WhatsAppProvider` for the harness [WhatsApp capability seam](../whatsapp/README.md) (`ctx.whatsapp`), backed by one [Baileys](https://github.com/WhiskeySockets/Baileys) connection to a personal WhatsApp account.
+
+This is an **implementation** package: it registers a provider into `ctx.whatsapp`, it does not own the key and it registers no model-facing tool. It is a function/namespace plugin (`inject: ['whatsapp']`).
+
+## Baileys is not a dependency
+
+`baileys` appears in no field of this package's manifest, and installing this package installs nothing from it. Baileys reaches `libsignal`, which is GPL-3.0 and resolves from a git repository; this repository is MIT and its pnpm policy rejects a git-resolved transitive dependency outright (`ERR_PNPM_EXOTIC_SUBDEP`), including through an optional peer, because peers are still resolved at install time.
+
+A deployment installs Baileys itself and names it through `moduleSpecifier`; this package loads it with a dynamic `import()` the first time it connects. That install is where Baileys' license and its account-ban risk are accepted.
+
+```sh
+pnpm add baileys   # in the deployment, not in this repository
+```
+
+Without it, connecting fails with `WHATSAPP_BAILEYS_MISSING`, the provider marks itself terminal, and no reconnection is attempted — no retry can install a package. `ctx.whatsapp` then reports `offline` and every operation fails with `WHATSAPP_PROVIDER_UNAVAILABLE`.
+
+Because Baileys is absent from the repository, everything here is pinned against the `WhatsAppSocket` port instead: the status machine, the reconnection policy, the message normalization, and the conversation index are covered by tests over a socket double, while **the binding to the real library has never run against WhatsApp**. Treat the first live pairing as the untested step.
+
+## Connection
+
+The provider owns one connection's lifecycle. It opens eagerly when the plugin loads and reports progress through `status()` and `whatsapp/status`: `connecting`, then `pairing` carrying the QR payload a human scans, then `online` with the account id. An unexpected close reopens after `reconnectDelay` until `maxReconnectAttempts` consecutive attempts are spent, after which the provider stops and reports `WHATSAPP_RECONNECT_EXHAUSTED`. A logged-out close is terminal: the credentials are dead, so it becomes `logged-out` without retrying.
+
+Teardown is LIFO — the connection closes before the registration is withdrawn, so nothing dispatches onto a closing socket.
+
+Auth state is a mutable multi-file directory (`authDir`), not a credential reference. It is what lets a paired account resume without a new QR scan; it grants full access to the account and must stay out of git.
+
+## Conversations
+
+Baileys ships no message store, so `listChats` and `fetchMessages` answer from what **this connection observed since it loaded**: both are empty right after a restart and grow as messages arrive. `listChats` orders by newest observed message; `fetchMessages` returns newest-first and pages with `before`. A chat this connection never observed fails with `WHATSAPP_UNKNOWN_CHAT` rather than returning an empty page, because an empty page and an unknown address are different answers. Per-chat retention is capped by `historyPerChat`, evicting oldest-first.
+
+A message with no id, no chat address, or no content is a protocol frame rather than a conversation message and is discarded. Media the seam cannot represent becomes `unsupported` with its media type, so a consumer still sees that something arrived.
+
+## Config
+
+| Key | Default | Meaning |
+|---|---|---|
+| `moduleSpecifier` | `baileys` | Module specifier of the Baileys library the deployment installed. |
+| `authDir` | `.dsh/whatsapp/auth` | Directory holding the multi-file auth state that resumes a paired account. |
+| `deviceName` | `DeepSeek Harness` | Name shown in WhatsApp's linked-devices list. |
+| `reconnectDelay` | `5000` | Milliseconds before reopening a connection that closed unexpectedly. |
+| `maxReconnectAttempts` | `5` | Consecutive reopen attempts before giving up until the plugin is reloaded. |
+| `historyPerChat` | `200` | Messages retained per conversation for `fetchMessages`. |
+
+`reconnectDelay` and `historyPerChat` must be positive finite numbers and `maxReconnectAttempts` a non-negative integer (`0` legitimately means "never reconnect"); an invalid value throws at plugin construction rather than producing a provider that silently never reconnects.
+
+## Model Experience
+
+Indirectly, through whichever consumer puts these conversations in front of a model; this package registers no tool, prompt, or schema, and such a consumer sends personal messages to the LLM provider and writes them to the session log.
+
+#### KV Cache effect
+
+No direct invalidation; the consumer owns any request-prefix changes.
+
+## Known Limitations and Deferred Work
+
+- **The Baileys binding is unverified against the real library** — every test drives a socket double, and no live pairing has run. The library is unofficial and reverse-engineered, so WhatsApp may ban the number or break the client at any time; use a dedicated test number.
+- **History is per-process** — a restart loses the conversation index, and reconnection history replay repeats message ids a consumer already saw. A consumer that must act once keeps its own processed-id set.
+- **Group names are absent until observed** — a conversation's display name is derived from `pushName` on an inbound direct message, so a group's subject stays unresolved until the connection observes one.
+- **Text only, no presence** — sending media, downloading media, typing indicators, and delivery receipts are deferred work.
+- **`unreadCount` counts what this connection observed**, not WhatsApp's own unread state, and `markRead` clears it on the account rather than in this index.
