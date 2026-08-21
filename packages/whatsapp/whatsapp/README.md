@@ -13,6 +13,7 @@ This is the **definition** package. It owns the vocabulary, the events, and the 
 | `register(provider)` | Registers the sole provider; a second registration throws `WHATSAPP_PROVIDER_ALREADY_REGISTERED`. Returns the disposer, disposed with the calling fiber. |
 | `status()` | The account's connection state; `offline` while no provider is registered. Never throws. |
 | `listChats(signal?)` | Conversations the connected account knows about. |
+| `resolveChat(chatId, signal?)` | The conversation one address names, kind decided by the provider and named when the connection observed it. Rejects a value that names no conversation with `WHATSAPP_UNKNOWN_CHAT`. |
 | `fetchMessages(request, signal?)` | One page of a chat's history, newest first. |
 | `send(request, signal?)` | Sends one text message and emits `whatsapp/message-sent` once acknowledged. |
 | `markRead(chatId, signal?)` | Marks a chat read up to its newest message. |
@@ -35,7 +36,7 @@ Acknowledgement means WhatsApp accepted the message, not that it was delivered o
 
 `WhatsAppChatId` and `WhatsAppMessageId` are branded strings: a chat id is the account-visible conversation address, a message id is opaque and only meaningful to the connection that observed it.
 
-A chat id is opaque too. WhatsApp addresses conversations through several domains and adds more over time — a live account reports direct conversations as both `@s.whatsapp.net` and `@lid`, and `@newsletter` and `@broadcast` exist beside them — so a consumer must not parse a chat id, and must not classify one against a closed set of suffixes. `WhatsAppChat.kind` and `WhatsAppMessage.chatKind` already carry the classification, decided by the provider that tracks WhatsApp's address spaces; a consumer that re-derives it rejects addresses the provider legitimately reports.
+A chat id is opaque too. WhatsApp addresses conversations through several domains and adds more over time — a live account reports direct conversations as both `@s.whatsapp.net` and `@lid`, and `@newsletter` and `@broadcast` exist beside them — so a consumer must not parse a chat id, and must not classify one against a closed set of suffixes. `WhatsAppChat.kind` and `WhatsAppMessage.chatKind` already carry the classification, decided by the provider that tracks WhatsApp's address spaces; a consumer holding only an address calls `resolveChat` rather than re-deriving one, which rejects addresses the provider legitimately reports.
 
 ## Model Experience
 

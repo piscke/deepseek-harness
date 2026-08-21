@@ -25,6 +25,22 @@ import type {
 /** Group conversations are the only ones WhatsApp addresses through this domain. */
 const GROUP_JID_SUFFIX = '@g.us'
 
+/**
+ * Classify one conversation address.
+ *
+ * WhatsApp addresses direct conversations through more than one domain — a
+ * paired account reports both `@s.whatsapp.net` and `@lid` — and adds domains
+ * over time, so only the group domain is matched and every other address is
+ * direct. Refusing an unfamiliar domain would take the account offline for the
+ * conversations WhatsApp migrated, which is worse than treating a channel like
+ * a person.
+ * @param jid - the conversation address.
+ * @returns the conversation kind.
+ */
+export function chatKindOf(jid: string): WhatsAppChatKind {
+  return jid.endsWith(GROUP_JID_SUFFIX) ? 'group' : 'direct'
+}
+
 /** Addressing fields Baileys attaches to every message. */
 export interface BaileysKey {
   readonly id?: string | null
@@ -287,7 +303,7 @@ function normalizeMessage(raw: BaileysMessage): WhatsAppMessage | undefined {
   if (body === null || body === undefined) return undefined
   const content = contentOf(body)
   if (content === undefined) return undefined
-  const chatKind: WhatsAppChatKind = remoteJid.endsWith(GROUP_JID_SUFFIX) ? 'group' : 'direct'
+  const chatKind = chatKindOf(remoteJid)
   const pushName = raw.pushName ?? undefined
   // `pushName` is the author's own display name, so it names the conversation
   // only in a direct chat with the other party. A group's subject is not on the

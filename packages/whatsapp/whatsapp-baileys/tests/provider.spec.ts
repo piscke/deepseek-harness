@@ -312,6 +312,29 @@ describe('history', () => {
     expect(() => scripted.provider.fetchMessages({ chatId })).toThrow(WhatsAppError)
     expect(() => scripted.provider.fetchMessages({ chatId })).toThrow(/has not been observed/)
   })
+
+  it('resolves an observed chat with the name and unread count it recorded', async () => {
+    const scripted = await online()
+    scripted.emit({ kind: 'message', message: message() })
+    await expect(scripted.provider.resolveChat(chatId))
+      .resolves.toEqual({ id: chatId, kind: 'direct', name: 'Ana', unreadCount: 1 })
+  })
+
+  it('resolves an address it never observed, so a conversation stays addressable', async () => {
+    const scripted = await online()
+    await expect(scripted.provider.resolveChat(WhatsAppChatId('94257503293551@lid')))
+      .resolves.toEqual({ id: '94257503293551@lid', kind: 'direct', unreadCount: 0 })
+    await expect(scripted.provider.resolveChat(WhatsAppChatId('120363000000000000@g.us')))
+      .resolves.toEqual({ id: '120363000000000000@g.us', kind: 'group', unreadCount: 0 })
+  })
+
+  it('refuses a value that names no conversation at all', async () => {
+    const scripted = await online()
+    for (const bogus of ['ana', '@s.whatsapp.net', '5511999990000@']) {
+      expect(() => scripted.provider.resolveChat(WhatsAppChatId(bogus))).toThrow(WhatsAppError)
+      expect(() => scripted.provider.resolveChat(WhatsAppChatId(bogus))).toThrow(/names no WhatsApp conversation/)
+    }
+  })
 })
 
 describe('dispatch', () => {
@@ -341,6 +364,7 @@ describe('dispatch', () => {
     const scripted = await online()
     const signal = AbortSignal.abort()
     expect(() => scripted.provider.listChats(signal)).toThrow()
+    expect(() => scripted.provider.resolveChat(chatId, signal)).toThrow()
     expect(() => scripted.provider.fetchMessages({ chatId }, signal)).toThrow()
     await expect(scripted.provider.send({ chatId, text: 'olá' }, signal)).rejects.toThrow()
     await expect(scripted.provider.markRead(chatId, signal)).rejects.toThrow()

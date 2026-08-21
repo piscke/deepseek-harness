@@ -136,6 +136,23 @@ export class WhatsAppRuntime extends Service {
   }
 
   /**
+   * Resolve one conversation address into the conversation it names.
+   *
+   * A chat id is opaque: WhatsApp addresses conversations through several
+   * domains and adds more over time, so only the provider can say what an
+   * address means. It answers for an address the connection has never
+   * observed — naming it when it has — because a consumer must be able to
+   * address a conversation it learned about from an incoming message or from
+   * the operator, and the connection-scoped index is not a roster.
+   * @param chatId - the conversation address to resolve.
+   * @param signal - optional cancellation signal forwarded to the provider.
+   * @returns the conversation, named when this connection observed it.
+   */
+  async resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat> {
+    return this.requireOnline().resolveChat(chatId, signal)
+  }
+
+  /**
    * Mark one chat read up to its newest message.
    * @param chatId - the conversation to mark.
    * @param signal - optional cancellation signal forwarded to the provider.

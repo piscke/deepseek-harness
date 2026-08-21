@@ -115,6 +115,14 @@ export interface WhatsAppProvider {
   status(): WhatsAppStatus
   /** List known conversations; honor `signal` for cancellation. */
   listChats(signal?: AbortSignal): Promise<readonly WhatsAppChat[]>
+  /**
+   * Resolve one conversation address, deciding its kind and naming it when this
+   * connection observed it. The provider owns this because it tracks WhatsApp's
+   * address spaces; it must answer for an address it has never observed, and
+   * reject only a value that names no conversation at all, with
+   * `WHATSAPP_UNKNOWN_CHAT`.
+   */
+  resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat>
   /** Read one page of a chat's history, newest first; honor `signal`. */
   fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Promise<readonly WhatsAppMessage[]>
   /** Send one text message; honor `signal`. */

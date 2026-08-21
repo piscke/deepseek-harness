@@ -16,6 +16,8 @@ A consumer had already taken the invitation and re-derived chat kind by suffix, 
 
 Chat kind belongs to the provider, which tracks WhatsApp's address spaces, and a consumer reads `WhatsAppChat.kind` or `WhatsAppMessage.chatKind` rather than deriving it.
 
+The seam gains `resolveChat(chatId)`, so a consumer holding only an address gets the conversation back — kind decided by the provider, name filled when the connection observed it — instead of parsing. Only a value that names no conversation at all, having no user or no domain, is rejected, and the provider makes that call because it is the package that knows what an address is.
+
 An unfamiliar domain classifies as `direct` instead of failing. The seam README states that a chat id is opaque and must not be parsed, and the subsystem doc's classification rule is rewritten to say the provider owns the decision and degrades rather than refusing. A test pins `@lid` to `direct` so the graceful default is a contract rather than an accident of a ternary.
 
 ## Alternatives considered
@@ -26,7 +28,7 @@ An unfamiliar domain classifies as `direct` instead of failing. The seam README 
 
 **Normalize `@lid` to the phone-number address in the provider, so consumers see one domain.** Attractive, because it would keep the address space singular. Baileys cannot always map a linked identity back to a phone number, so some conversations would still surface as `@lid` and a consumer that trusted the normalization would break on exactly the cases the mapping failed for. Worth doing as an enrichment later; useless as a guarantee.
 
-**Expose `resolveChat` on the seam so the provider resolves ids for consumers.** The stronger design, and still open: it would delete address parsing from consumers entirely rather than merely forbidding it. Deferred because the immediate defect is a false rejection, which the opacity contract fixes without moving a method across a package boundary mid-stack.
+**Forbid parsing without offering a replacement.** Stating that a chat id is opaque does not, by itself, let a consumer act: a tool holding an address the connection never observed still needs the conversation's kind to route and its name to show an operator. `resolveChat` on the seam is what makes the prohibition affordable, which is why it ships with it rather than after it.
 
 ## Consequences
 

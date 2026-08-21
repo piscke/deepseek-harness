@@ -13,6 +13,7 @@ WhatsApp 能力 seam（`ctx.whatsapp`）：在恰好一个已认证账号之上�
 | `register(provider)` | 注册唯一的 provider；第二次注册抛出 `WHATSAPP_PROVIDER_ALREADY_REGISTERED`。返回 disposer，随调用方 fiber 一同释放。 |
 | `status()` | 账号的连接状态；未注册 provider 时为 `offline`。永不抛出。 |
 | `listChats(signal?)` | 已连接账号所知的对话。 |
+| `resolveChat(chatId, signal?)` | 一个地址所指的对话；类型由 provider 判定，连接观察到时带上名称。对不指向任何对话的值以 `WHATSAPP_UNKNOWN_CHAT` 拒绝。 |
 | `fetchMessages(request, signal?)` | 某个对话历史的一页，最新在前。 |
 | `send(request, signal?)` | 发送一条文本消息，并在被确认后发出 `whatsapp/message-sent`。 |
 | `markRead(chatId, signal?)` | 将对话标记为已读至其最新消息。 |
@@ -35,7 +36,7 @@ WhatsApp 能力 seam（`ctx.whatsapp`）：在恰好一个已认证账号之上�
 
 `WhatsAppChatId` 与 `WhatsAppMessageId` 是 branded 字符串：对话 id 是账号可见的会话地址，消息 id 不透明，且只对观察到它的那条连接有意义。
 
-对话 id 同样不透明。WhatsApp 通过多个域为会话编址，并会不断新增 —— 线上账号会把一对一对话同时报告为 `@s.whatsapp.net` 与 `@lid`，此外还并存 `@newsletter` 与 `@broadcast` —— 因此消费者不得解析对话 id，也不得用封闭的后缀集合去分类它。`WhatsAppChat.kind` 与 `WhatsAppMessage.chatKind` 已经携带该分类，由跟踪 WhatsApp 地址空间的 provider 判定；自行重新推导的消费者会拒绝 provider 合法报告的地址。
+对话 id 同样不透明。WhatsApp 通过多个域为会话编址，并会不断新增 —— 线上账号会把一对一对话同时报告为 `@s.whatsapp.net` 与 `@lid`，此外还并存 `@newsletter` 与 `@broadcast` —— 因此消费者不得解析对话 id，也不得用封闭的后缀集合去分类它。`WhatsAppChat.kind` 与 `WhatsAppMessage.chatKind` 已经携带该分类，由跟踪 WhatsApp 地址空间的 provider 判定；只持有地址的消费者应调用 `resolveChat`，而不是自行重新推导 —— 后者会拒绝 provider 合法报告的地址。
 
 ## 模型体验
 

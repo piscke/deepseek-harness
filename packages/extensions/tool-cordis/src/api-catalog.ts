@@ -2238,6 +2238,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the acknowledged message identity and send time.',
       },
       {
+        signature: 'async resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat>',
+        description: 'Resolve one conversation address into the conversation it names.\n\nA chat id is opaque: WhatsApp addresses conversations through several domains and adds more over time, so only the provider can say what an address means. It answers for an address the connection has never observed — naming it when it has — because a consumer must be able to address a conversation it learned about from an incoming message or from the operator, and the connection-scoped index is not a roster.',
+        parameters: [{ name: 'chatId', description: 'the conversation address to resolve.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the conversation, named when this connection observed it.',
+      },
+      {
         signature: 'async markRead(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<void>',
         description: 'Mark one chat read up to its newest message.',
         parameters: [{ name: 'chatId', description: 'the conversation to mark.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
@@ -4880,7 +4886,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WhatsAppProvider',
-    declaration: 'export interface WhatsAppProvider {\n    readonly id: string;\n    available(): boolean;\n    status(): WhatsAppStatus;\n    listChats(signal?: AbortSignal): Promise<readonly WhatsAppChat[]>;\n    fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Promise<readonly WhatsAppMessage[]>;\n    send(request: WhatsAppSendRequest, signal?: AbortSignal): Promise<WhatsAppSentMessage>;\n    markRead(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<void>;\n}',
+    declaration: 'export interface WhatsAppProvider {\n    readonly id: string;\n    available(): boolean;\n    status(): WhatsAppStatus;\n    listChats(signal?: AbortSignal): Promise<readonly WhatsAppChat[]>;\n    resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat>;\n    fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Promise<readonly WhatsAppMessage[]>;\n    send(request: WhatsAppSendRequest, signal?: AbortSignal): Promise<WhatsAppSentMessage>;\n    markRead(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<void>;\n}',
   },
   {
     name: 'WhatsAppSendRequest',

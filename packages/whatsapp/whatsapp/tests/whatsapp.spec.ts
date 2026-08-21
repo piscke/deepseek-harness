@@ -46,6 +46,7 @@ function makeProvider(overrides: Partial<WhatsAppProvider> = {}): WhatsAppProvid
     fetchMessages: () => Promise.resolve([message()]),
     send: () => Promise.resolve(sent()),
     markRead: () => Promise.resolve(),
+    resolveChat: (chatId: WhatsAppChatId) => Promise.resolve({ id: chatId, kind: 'direct' as const, unreadCount: 0 }),
     ...overrides,
   }
 }
@@ -110,6 +111,7 @@ describe('WhatsAppRuntime operations', () => {
     await expect(whatsapp.fetchMessages({ chatId })).rejects.toThrow(notOnline)
     await expect(whatsapp.send({ chatId, text: 'oi' })).rejects.toThrow(notOnline)
     await expect(whatsapp.markRead(chatId)).rejects.toThrow(notOnline)
+    await expect(whatsapp.resolveChat(chatId)).rejects.toThrow(notOnline)
   })
 
   it('forwards the cancellation signal and paging cursor to the provider', async () => {
@@ -140,6 +142,15 @@ describe('WhatsAppRuntime operations', () => {
     await whatsapp.markRead(chatId)
 
     expect(markRead).toHaveBeenCalledWith(chatId, undefined)
+  })
+
+  it('resolves a conversation address through the provider', async () => {
+    const { whatsapp } = await mount()
+    const resolveChat = vi.fn((id: WhatsAppChatId) => Promise.resolve({ id, kind: 'group' as const, unreadCount: 3 }))
+    whatsapp.register(makeProvider({ resolveChat }))
+
+    await expect(whatsapp.resolveChat(chatId)).resolves.toEqual({ id: chatId, kind: 'group', unreadCount: 3 })
+    expect(resolveChat).toHaveBeenCalledWith(chatId, undefined)
   })
 })
 

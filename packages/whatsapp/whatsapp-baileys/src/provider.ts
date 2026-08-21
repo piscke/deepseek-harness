@@ -19,6 +19,7 @@ import type {
   WhatsAppStatus,
 } from '@deepseek-ai/dsh-whatsapp'
 import { sameStatus } from './status.ts'
+import { chatKindOf } from './socket.ts'
 import type { SocketEvent, WhatsAppSocket, WhatsAppSocketOpener } from './socket.ts'
 
 /** Deployment-varying behavior of one provider instance. */
@@ -108,6 +109,20 @@ export class BaileysProvider implements WhatsAppProvider {
     signal?.throwIfAborted()
     const chats = [...this.chats.values()].sort((left, right) => right.newest.localeCompare(left.newest))
     return Promise.resolve(chats.map(record => record.chat))
+  }
+
+  resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat> {
+    signal?.throwIfAborted()
+    const record = this.chats.get(chatId)
+    if (record !== undefined) return Promise.resolve(record.chat)
+    const [user, domain] = chatId.split('@')
+    if (user === undefined || user === '' || domain === undefined || domain === '') {
+      throw new WhatsAppError(
+        `"${chatId}" names no WhatsApp conversation; an address is a user and a domain, such as <number>@s.whatsapp.net`,
+        'WHATSAPP_UNKNOWN_CHAT',
+      )
+    }
+    return Promise.resolve({ id: chatId, kind: chatKindOf(chatId), unreadCount: 0 })
   }
 
   fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Promise<readonly WhatsAppMessage[]> {

@@ -92,6 +92,21 @@ async fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Prom
 async send(request: WhatsAppSendRequest, signal?: AbortSignal): Promise<WhatsAppSentMessage>
 
 /**
+ * Resolve one conversation address into the conversation it names.
+ *
+ * A chat id is opaque: WhatsApp addresses conversations through several
+ * domains and adds more over time, so only the provider can say what an
+ * address means. It answers for an address the connection has never
+ * observed — naming it when it has — because a consumer must be able to
+ * address a conversation it learned about from an incoming message or from
+ * the operator, and the connection-scoped index is not a roster.
+ * @param chatId - the conversation address to resolve.
+ * @param signal - optional cancellation signal forwarded to the provider.
+ * @returns the conversation, named when this connection observed it.
+ */
+async resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat>
+
+/**
  * Mark one chat read up to its newest message.
  * @param chatId - the conversation to mark.
  * @param signal - optional cancellation signal forwarded to the provider.
@@ -124,7 +139,7 @@ One message was observed in a chat, including messages the connected account sen
 'whatsapp/message-received'(message: WhatsAppMessage): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:156`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:164`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappmessage-sent--emit"></a>
 
@@ -143,7 +158,7 @@ The provider acknowledged one send requested through `ctx.whatsapp`. Acknowledge
 'whatsapp/message-sent'(message: WhatsAppSentMessage): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:164`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:172`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappstatus--emit"></a>
 
@@ -162,5 +177,5 @@ The account's connection state changed, emitted once per transition. A `pairing`
 'whatsapp/status'(status: WhatsAppStatus): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:146`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:154`](../../packages/whatsapp/whatsapp/src/types.ts)
 <!-- END GENERATED cordis-surface -->
