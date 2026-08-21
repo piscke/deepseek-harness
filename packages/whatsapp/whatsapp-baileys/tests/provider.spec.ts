@@ -133,6 +133,13 @@ describe('connection lifecycle', () => {
     expect(scripted.provider.available()).toBe(true)
   })
 
+  it('reports an unnamed account online when the socket names none', async () => {
+    const scripted = rig()
+    await scripted.provider.start()
+    scripted.emit({ kind: 'open' })
+    expect(scripted.statuses).toEqual([{ state: 'connecting' }, { state: 'online' }])
+  })
+
   it('publishes the pairing payload every time it rotates', async () => {
     const scripted = rig()
     await scripted.provider.start()

@@ -22,6 +22,8 @@ An account is one long-lived connection, so status belongs to the capability rat
 
 `send` rejects an empty or whitespace-only body (`WHATSAPP_EMPTY_MESSAGE`) and `fetchMessages` rejects a non-positive or fractional `limit` (`WHATSAPP_INVALID_LIMIT`) before reaching the provider, so a provider never has to define what those mean.
 
+The `pairing` payload is a credential, not a progress detail: whoever scans it links a device holding full access to the account, which outranks any message body. A surface that displays or forwards it decides who can see it. `online` names the account rather than the device it connected through, and omits the name instead of inventing one when the provider cannot report it.
+
 ## Events
 
 | Event | Emitted when |

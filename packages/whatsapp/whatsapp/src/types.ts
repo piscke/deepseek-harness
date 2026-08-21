@@ -22,7 +22,11 @@ export type WhatsAppChatKind = 'direct' | 'group'
  * a new state breaks compilation at every consumer until handled.
  *
  * `pairing` carries the payload a human must scan or type to authorize the
- * connection; it is short-lived and replaced whenever the provider rotates it.
+ * connection; it is short-lived and replaced whenever the provider rotates it,
+ * and it is a credential — whoever scans it links a device with full access to
+ * the account, so a surface that displays it decides who can see it.
+ * `online` names the account, not the device it connected through, and omits
+ * the name rather than inventing one when the provider cannot report it.
  * `logged-out` is terminal for the current credentials: the account must pair
  * again, and no reconnection attempt can recover it.
  */
@@ -30,7 +34,7 @@ export type WhatsAppStatus =
   | { readonly state: 'offline' }
   | { readonly state: 'connecting' }
   | { readonly state: 'pairing'; readonly qr: string }
-  | { readonly state: 'online'; readonly accountId: string }
+  | { readonly state: 'online'; readonly accountId?: string }
   | { readonly state: 'logged-out'; readonly reason: string }
 
 /** One conversation the connected account participates in. */
