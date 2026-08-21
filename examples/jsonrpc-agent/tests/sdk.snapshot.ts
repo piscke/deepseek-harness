@@ -207,12 +207,25 @@ function contextOfContents(contents: readonly string[]): NormalizeContext {
   }
 }
 
+/**
+ * Copy each committed fixture into the run's workspace with `{{cwd}}` resolved.
+ *
+ * The token sits inside JSON string literals, so the path is escaped as JSON
+ * rather than spliced in raw: a Windows cwd such as `C:\Users\…` otherwise
+ * writes `\U`, which is not a legal JSON escape, and every replay line fails
+ * to parse. A POSIX path escapes to itself.
+ *
+ * @param scenario - The scenario naming the fixtures to hydrate.
+ * @param cwd - The generated workspace the recording's `{{cwd}}` stands for.
+ * @returns Absolute paths of the hydrated fixtures, parent first.
+ */
 async function hydrateReplayFixtures(scenario: SdkScenario, cwd: string): Promise<string[]> {
   const root = join(cwd, '.replay-fixtures')
+  const escaped = JSON.stringify(cwd).slice(1, -1)
   await mkdir(root, { recursive: true })
   return Promise.all(fixtureFiles(scenario).map(async (source) => {
     const destination = join(root, basename(source))
-    await writeFile(destination, (await readFile(source, 'utf8')).replaceAll('{{cwd}}', cwd))
+    await writeFile(destination, (await readFile(source, 'utf8')).replaceAll('{{cwd}}', escaped))
     return destination
   }))
 }
