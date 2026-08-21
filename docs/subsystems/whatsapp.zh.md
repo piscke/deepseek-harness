@@ -22,7 +22,7 @@ WhatsApp 账号不是按请求使用的凭据：它是一条长期存在的已�
 
 ## 历史来自 provider 自己的观察
 
-seam 不拥有任何消息数据库。`listChats` 与 `fetchMessages` 返回已注册 provider 所保留的内容，而随附的 Baileys provider 只保留其连接自加载以来观察到的内容 —— 刚重启后二者都为空。需要持久对话历史的消费者应记录抵达模型的内容，这正是 [model-visible ⟺ logged 规则](../architecture.md)已经要求的。
+seam 不拥有任何消息数据库。`listChats` 与 `fetchMessages` 返回已注册 provider 所保留的内容，而随附的 Baileys provider 只保留其连接自加载以来观察到的内容，重启会将其丢弃。需要持久对话历史的消费者应记录抵达模型的内容，这正是 [model-visible ⟺ logged 规则](../architecture.md)已经要求的。
 
 因此当 provider 在重连后回放历史时，`whatsapp/message-received` 会重复某个 id：必须只处理一次的消费者要自行保存已处理 id 集合。`whatsapp/message-sent` 表示 WhatsApp 接受了该消息，而非它已送达或被阅读。
 

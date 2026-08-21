@@ -22,7 +22,7 @@ Chat kind is the routing discriminator, so a provider that cannot classify a con
 
 ## History is the provider's own observation
 
-The seam owns no message database. `listChats` and `fetchMessages` return what the registered provider retained, and the shipped Baileys provider retains only what its connection observed since it loaded — both are empty right after a restart. A consumer that needs durable conversation history logs what reaches the model, which the [model-visible ⟺ logged rule](../architecture.md) already requires.
+The seam owns no message database. `listChats` and `fetchMessages` return what the registered provider retained, and the shipped Baileys provider retains only what its connection observed since it loaded, which a restart discards. A consumer that needs durable conversation history logs what reaches the model, which the [model-visible ⟺ logged rule](../architecture.md) already requires.
 
 `whatsapp/message-received` therefore repeats an id when a provider replays history after a reconnection: a consumer that must act once keeps its own processed-id set. `whatsapp/message-sent` means WhatsApp accepted the message, not that it was delivered or read.
 
