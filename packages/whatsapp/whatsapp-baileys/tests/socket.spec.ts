@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { WhatsAppChatId, WhatsAppError, WhatsAppMessageId } from '@deepseek-ai/dsh-whatsapp'
 import { baileysOpener, loadBaileys } from '@deepseek-ai/dsh-whatsapp-baileys'
 import type {
@@ -129,6 +132,36 @@ describe('module loading', () => {
       browser: ['Console', 'Chrome', '2.0.0'],
       syncFullHistory: false,
     })
+  })
+})
+
+describe('stored pairing', () => {
+  /** Open over a real directory so the credential file is read from disk. */
+  async function openOver(creds: string | undefined): Promise<void> {
+    const authDir = await mkdtemp(join(tmpdir(), 'dsh-whatsapp-'))
+    try {
+      if (creds !== undefined) await writeFile(join(authDir, 'creds.json'), creds)
+      const { module } = makeModule()
+      await baileysOpener(
+        { moduleSpecifier: 'baileys', authDir, browser: ['DSH', 'Chrome', '1.0.0'] },
+        () => Promise.resolve(module),
+      )(() => {})
+    } finally {
+      await rm(authDir, { recursive: true, force: true })
+    }
+  }
+
+  it('refuses to connect on a truncated credential file rather than linking a new device', async () => {
+    await expect(openOver('')).rejects.toMatchObject({ code: 'WHATSAPP_AUTH_STATE_DAMAGED' })
+    await expect(openOver('{"noiseKey":')).rejects.toThrow(/are damaged/)
+  })
+
+  it('connects over an intact credential file', async () => {
+    await expect(openOver('{"me":{"id":"5511888880000:1@s.whatsapp.net"}}')).resolves.toBeUndefined()
+  })
+
+  it('connects when the directory holds no credentials yet', async () => {
+    await expect(openOver(undefined)).resolves.toBeUndefined()
   })
 })
 

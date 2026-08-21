@@ -21,6 +21,11 @@ import type {
   WhatsAppSendRequest,
   WhatsAppSentMessage,
 } from '@deepseek-ai/dsh-whatsapp'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
+/** The file `useMultiFileAuthState` keeps the paired identity in. */
+const CREDS_FILE = 'creds.json'
 
 /** Group conversations are the only ones WhatsApp addresses through this domain. */
 const GROUP_JID_SUFFIX = '@g.us'
@@ -167,6 +172,7 @@ export function baileysOpener(
 ): WhatsAppSocketOpener {
   return async (onEvent) => {
     const baileys = await loadModule(load, options.moduleSpecifier)
+    await assertPairingReadable(options.authDir)
     const { state, saveCreds } = await baileys.useMultiFileAuthState(options.authDir)
     const socket = baileys.default({
       auth: state,
@@ -185,6 +191,37 @@ async function loadModule(load: BaileysLoader, specifier: string): Promise<Baile
     throw new WhatsAppError(
       `the WhatsApp library "${specifier}" is not installed in this deployment; install it to enable the WhatsApp provider`,
       'WHATSAPP_BAILEYS_MISSING',
+      { cause },
+    )
+  }
+}
+
+/**
+ * Refuse to connect on a damaged paired identity.
+ *
+ * `useMultiFileAuthState` rewrites `creds.json` in place on every credential
+ * update, so a process killed mid-write, or two processes sharing one
+ * directory, leaves a truncated file. Baileys reads that as "no credentials"
+ * and registers a new device, which silently abandons the pairing and orphans
+ * the entry in the account's linked-devices list. An absent file is a first
+ * run and connects normally; a present but unreadable one stops here.
+ * @param authDir - directory holding the multi-file auth state.
+ */
+async function assertPairingReadable(authDir: string): Promise<void> {
+  const path = join(authDir, CREDS_FILE)
+  let contents: string
+  try {
+    contents = await readFile(path, 'utf8')
+  } catch {
+    // No credential file: an unpaired directory, which pairing will populate.
+    return
+  }
+  try {
+    JSON.parse(contents)
+  } catch (cause) {
+    throw new WhatsAppError(
+      `the WhatsApp credentials at "${path}" are damaged, so connecting would abandon the existing pairing and link a new device; delete the directory to pair again`,
+      'WHATSAPP_AUTH_STATE_DAMAGED',
       { cause },
     )
   }
