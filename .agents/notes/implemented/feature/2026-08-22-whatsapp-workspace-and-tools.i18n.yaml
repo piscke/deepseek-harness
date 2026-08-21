@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-22-whatsapp-workspace-and-tools.md
+2026-08-22-whatsapp-workspace-and-tools.md: 179b52c0f57ed402896fd2dd3351060d350d8e92
+2026-08-22-whatsapp-workspace-and-tools.zh.md: d78f5450c52f9395a636584d2c579064a600e52d

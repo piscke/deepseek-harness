@@ -8,6 +8,10 @@
 |---|---|---|
 | [`whatsapp/`](whatsapp/README.md) | 定义连接状态、对话、消息、发送以及 provider 槽位 | `ctx.whatsapp` |
 | [`whatsapp-baileys/`](whatsapp-baileys/README.md) | 通过 Baileys 库连接一个账号 | 注册到 `ctx.whatsapp` |
+| [`whatsapp-workspace/`](whatsapp-workspace/README.md) | 拥有 WhatsApp 工作区目录、其对话会话以及入站路由 | 消费 `ctx.whatsapp` |
+| [`tool-whatsapp/`](tool-whatsapp/README.md) | 面向模型的工具，包括经审批把关的发送 | 消费 `ctx.whatsapp` |
+
+seam、连接、工作区与工具是各自独立的包，因为部署会分别选择它们：无界面的组合只取工具而不要工作区，而分诊部署会取工作区并关掉 `send`。
 
 一个 WhatsApp 账号是一条长期存在的已认证连接，而非按请求使用的凭据，因此该 seam 把状态作为能力的一部分上报，并且在账号未在线时拒绝每一个操作。
 

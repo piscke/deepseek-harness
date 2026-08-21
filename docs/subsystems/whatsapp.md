@@ -2,7 +2,7 @@
 
 English | [中文](whatsapp.zh.md)
 
-The WhatsApp seam — a [capability seam](../glossary.md#capability-seam) over **one authenticated personal WhatsApp account**, split across packages: Service Definition ([dsh-whatsapp](../../packages/whatsapp/whatsapp), `ctx.whatsapp` + the single provider slot) and Service Provider ([dsh-whatsapp-baileys](../../packages/whatsapp/whatsapp-baileys), one Baileys connection). WhatsApp is an optional capability, not part of the agent-loop spine.
+The WhatsApp seam — a [capability seam](../glossary.md#capability-seam) over **one authenticated personal WhatsApp account**, split across packages: Service Definition ([dsh-whatsapp](../../packages/whatsapp/whatsapp), `ctx.whatsapp` + the single provider slot), Service Provider ([dsh-whatsapp-baileys](../../packages/whatsapp/whatsapp-baileys), one Baileys connection), and two Consumers — [dsh-whatsapp-workspace](../../packages/whatsapp/whatsapp-workspace), which turns the inbound stream into sessions, and [dsh-tool-whatsapp](../../packages/whatsapp/tool-whatsapp), which gives the model names for the account. WhatsApp is an optional capability, not part of the agent-loop spine.
 
 Source: [`packages/whatsapp/whatsapp/src/types.ts`](../../packages/whatsapp/whatsapp/src/types.ts)
 
@@ -25,6 +25,22 @@ Chat kind is the routing discriminator, and the provider owns it: it classifies 
 The seam owns no message database. `listChats` and `fetchMessages` return what the registered provider retained, and the shipped Baileys provider retains only what its connection observed since it loaded, which a restart discards. A consumer that needs durable conversation history logs what reaches the model, which the [model-visible ⟺ logged rule](../architecture.md) already requires.
 
 `whatsapp/message-received` therefore repeats an id when a provider replays history after a reconnection: a consumer that must act once keeps its own processed-id set. `whatsapp/message-sent` means WhatsApp accepted the message, not that it was delivered or read.
+
+## A conversation is a session in a Workspace
+
+[dsh-whatsapp-workspace](../../packages/whatsapp/whatsapp-workspace) gives the account a place to live: a directory registered through `ctx.workspaceRegistry`, so a WhatsApp Workspace appears in the Web UI beside repository workspaces, and sessions inside it whose `cwd` is that directory. `route` decides how conversations map onto sessions — `category` (groups and direct chats), `per-chat`, or `single` — and it is required, because no shape is right for every account.
+
+A category or single route means one session serves many conversations, so the conversation cannot be ambient context. Every delivered message carries its chat kind, display name, and `[chat_id: …]` in the text the model reads, and that id is exactly what `whatsapp_send_message` requires: answering the right person is a copy, not an inference.
+
+Inbound delivery never interrupts. A message arriving mid-turn waits, claims the agent's idle phase through the maintenance path, and becomes a later turn; a burst coalesces into one wake-up while staying one turn per message. Model-visible ⟺ logged holds in the failing direction — `whatsapp/inbound` is appended before the turn is queued, so a message the log refuses never reaches the model, and the queue behind it keeps moving.
+
+The one thing the deployment never routes is the account's own messages. `fromMe` covers the operator typing on their phone as well as the harness's own answers echoed back; delivering either would wake the agent with words it already has. Everything else the seam publishes is something a person sent, so routing needs no other content judgment.
+
+## Answering is a decision, per message
+
+[dsh-tool-whatsapp](../../packages/whatsapp/tool-whatsapp) owns the model-facing surface: `whatsapp_list_chats`, `whatsapp_read_chat`, `whatsapp_mark_read`, and `whatsapp_send_message`. There is no auto-reply path anywhere in this subsystem; a routed message reaches a model, and everything after that is a tool call.
+
+`chat_id` is required on every tool that names a conversation. It is validated as a WhatsApp address rather than looked up in the account's chat list, because that list is connection-scoped: a provider builds it from observed activity, so it is empty right after connecting and gating on it would make the tools unusable on every restart. Sending additionally asks `ctx.approval` with the destination named in full, and fails closed on rejection, cancellation, and a missing approval channel alike. A confirmed send appends `whatsapp/outbound` only after the provider acknowledged it, so the log never claims a send WhatsApp refused.
 
 ## Privacy and account risk
 

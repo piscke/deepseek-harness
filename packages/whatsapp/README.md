@@ -8,6 +8,10 @@ This family connects the harness to one WhatsApp account so a session can read c
 |---|---|---|
 | [`whatsapp/`](whatsapp/README.md) | Defines connection status, conversations, messages, sending, and the provider slot | `ctx.whatsapp` |
 | [`whatsapp-baileys/`](whatsapp-baileys/README.md) | Connects one account through the Baileys library | registers on `ctx.whatsapp` |
+| [`whatsapp-workspace/`](whatsapp-workspace/README.md) | Owns the WhatsApp Workspace directory, its conversation sessions, and inbound routing | consumes `ctx.whatsapp` |
+| [`tool-whatsapp/`](tool-whatsapp/README.md) | The model-facing tools, including the approval-gated send | consumes `ctx.whatsapp` |
+
+The seam, the connection, the workspace, and the tools are separate packages because a deployment chooses each independently: a headless composition takes the tools without a Workspace, and a triage deployment takes the Workspace with `send` disabled.
 
 A WhatsApp account is one long-lived authenticated connection rather than a per-request credential, so the seam reports status as part of the capability and every operation fails while the account is not online.
 

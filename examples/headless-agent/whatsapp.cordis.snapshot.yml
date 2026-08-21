@@ -1,0 +1,47 @@
+# Keyless real-Loader composition for the WhatsApp tool-suite snapshot.
+#
+# The account is scripted rather than paired: a fixture registers a provider on
+# the real `ctx.whatsapp` seam and answers the approval questions, so the tools,
+# the approval choreography, and the `whatsapp/outbound` log entry all run their
+# shipped code paths without a network or a phone.
+
+- id: persistence
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: './.sessions'
+    compression: none
+
+- id: replay
+  name: '@deepseek-ai/dsh-llm-replay'
+  config:
+    file: !!js process.env.DSH_SNAPSHOT_FILE
+    overrideFile: !!js process.env.DSH_SNAPSHOT_OVERRIDE
+
+- id: approval
+  name: '@deepseek-ai/dsh-user-approval'
+  config:
+    policy: ask
+
+- id: whatsapp
+  name: '@deepseek-ai/dsh-whatsapp'
+
+- id: tool-whatsapp
+  name: '@deepseek-ai/dsh-tool-whatsapp'
+
+- id: agent
+  name: '@deepseek-ai/dsh-agent-spine-demo'
+  config:
+    agents:
+      - id: main
+        provider: deepseek-official
+        model: deepseek-v4-flash
+        cwd: !!js process.cwd()
+    workspaceContext: false
+    skills:
+      enabled: false
+    toolJobs: false
+    goals: false
+
+# Registered last: the account and the operator both need settled services.
+- id: scripted-account
+  name: './tests/fixtures/whatsapp-scripted-account.ts'

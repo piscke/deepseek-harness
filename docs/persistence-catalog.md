@@ -1005,3 +1005,37 @@ Source: [`packages/core/session/src/types.ts:264`](../packages/core/session/src/
 ```
 
 Source: [`packages/web/web-search-deepseek/src/provider.ts:83`](../packages/web/web-search-deepseek/src/provider.ts)
+
+### `whatsapp/*`
+
+<a id="whatsappinbound--log-only"></a>
+
+#### `whatsapp/inbound` — log-only
+
+```ts persistence-catalog
+/**
+ * One inbound WhatsApp message was delivered to this session as a
+ * follow-up turn. The turn's `user/message` carries the framing the model
+ * reads; this event carries the WhatsApp identity behind it, which the
+ * framing text cannot be parsed back into.
+ */
+'whatsapp/inbound': WhatsAppInboundEvent
+```
+
+Source: [`packages/whatsapp/whatsapp-workspace/src/types.ts:62`](../packages/whatsapp/whatsapp-workspace/src/types.ts)
+
+<a id="whatsappoutbound--log-only"></a>
+
+#### `whatsapp/outbound` — log-only
+
+```ts persistence-catalog
+/**
+ * The account sent one message this session composed, and the provider
+ * acknowledged it. Written only after acknowledgement, so the log never
+ * claims a send WhatsApp refused. Acknowledgement means WhatsApp accepted
+ * the message, not that it reached or was read by the recipient.
+ */
+'whatsapp/outbound': WhatsAppOutboundEvent
+```
+
+Source: [`packages/whatsapp/tool-whatsapp/src/types.ts:31`](../packages/whatsapp/tool-whatsapp/src/types.ts)

@@ -2905,6 +2905,38 @@ export interface Config {
 
 来源：[`packages/web/tool-web/src/index.ts:37`](../packages/web/tool-web/src/index.ts)
 
+<a id="deepseek-aidsh-tool-whatsapp"></a>
+
+## `@deepseek-ai/dsh-tool-whatsapp`
+
+需要：`tools` · `whatsapp`
+
+```ts config-catalog
+/** Plugin config: which WhatsApp tools to register and their per-call bounds. */
+export interface Config {
+  /** Register `whatsapp_send_message`. Defaults to true. */
+  send?: boolean
+  /** Register `whatsapp_list_chats`. Defaults to true. */
+  listChats?: boolean
+  /** Register `whatsapp_read_chat`. Defaults to true. */
+  readChat?: boolean
+  /** Register `whatsapp_mark_read`. Defaults to true. */
+  markRead?: boolean
+  /** Upper bound on conversations returned by one `whatsapp_list_chats` call. Defaults to 100. */
+  listChatsMaxResults?: number
+  /** History page size when `whatsapp_read_chat` is called without a limit. Defaults to 20. */
+  readChatDefaultLimit?: number
+  /** Upper bound on messages returned by one `whatsapp_read_chat` call. Defaults to 100. */
+  readChatMaxLimit?: number
+  /** Upper bound on one `whatsapp_send_message` body, in characters. Defaults to 4096. */
+  sendMaxTextChars?: number
+  /** Cooperative timeout budget (ms) for every WhatsApp tool. Defaults to 30000. */
+  timeoutMs?: number
+}
+```
+
+来源：[`packages/whatsapp/tool-whatsapp/src/index.ts:39`](../packages/whatsapp/tool-whatsapp/src/index.ts)
+
 <a id="deepseek-aidsh-tool-workflow"></a>
 
 ## `@deepseek-ai/dsh-tool-workflow`
@@ -3181,6 +3213,55 @@ export interface Config {
 ```
 
 来源：[`packages/whatsapp/whatsapp-baileys/src/index.ts:46`](../packages/whatsapp/whatsapp-baileys/src/index.ts)
+
+<a id="deepseek-aidsh-whatsapp-workspace"></a>
+
+## `@deepseek-ai/dsh-whatsapp-workspace`
+
+需要：`agents` · `sessionPersistence` · `sessions` · `sessionTitle` · `whatsapp` · `workspaceRegistry`
+
+```ts config-catalog
+/**
+ * Deployment policy for the WhatsApp Workspace. Every field is a validated
+ * `Config` member rather than a constant: the directory, the display titles,
+ * and the routing shape all vary per deployment and per language.
+ */
+export interface Config {
+  /** Directory the Workspace owns. A leading `~` expands to the user's home; the resolved path must be absolute. */
+  directory?: string
+  /** Display title of the Workspace registration in the sidebar. */
+  workspaceTitle?: string
+  /** How inbound conversations map onto sessions. Required: no routing shape is right for every deployment. */
+  route: WhatsAppRouteMode
+  /** Title pinned on the `category` route's group session. */
+  groupsTitle?: string
+  /** Title pinned on the `category` route's direct-chat session. */
+  contactsTitle?: string
+  /** Title pinned on the `single` route's one session. */
+  conversationsTitle?: string
+  /** When non-empty, only these chat ids are routed; every other conversation is dropped. */
+  allowChatIds?: string[]
+  /** Chat ids never routed. Applied after `allowChatIds`, so a denied id stays denied. */
+  denyChatIds?: string[]
+  /** How many recently delivered message ids are remembered to suppress a provider's history replay. */
+  seenMessageLimit?: number
+}
+
+/**
+ * How inbound conversations map onto sessions. A CLOSED union: consumers
+ * `switch` on it ending in `assertNever`, so a new mode breaks compilation.
+ *
+ * - `category` — two standing sessions, one for groups and one for direct
+ *   chats. Every conversation of a kind shares an agent, so each delivered
+ *   message must identify its chat.
+ * - `per-chat` — one session per conversation, created the first time that
+ *   conversation is routed.
+ * - `single` — every conversation shares one session.
+ */
+export type WhatsAppRouteMode = 'category' | 'per-chat' | 'single'
+```
+
+来源：[`packages/whatsapp/whatsapp-workspace/src/index.ts:58`](../packages/whatsapp/whatsapp-workspace/src/index.ts)
 
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 

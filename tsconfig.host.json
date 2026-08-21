@@ -243,6 +243,8 @@
     { "path": "./packages/web/tool-web" },
     { "path": "./packages/whatsapp/whatsapp" },
     { "path": "./packages/whatsapp/whatsapp-baileys" },
+    { "path": "./packages/whatsapp/whatsapp-workspace" },
+    { "path": "./packages/whatsapp/tool-whatsapp" },
     { "path": "./packages/spill/spill" },
     { "path": "./packages/spill/spill-local" },
     { "path": "./packages/spill/spill-policy" },

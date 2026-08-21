@@ -2,7 +2,7 @@
 
 [English](whatsapp.md) | 中文
 
-WhatsApp seam —— 覆盖**一个已认证的个人 WhatsApp 账号**的[能力 seam](../glossary.md#capability-seam)，跨包拆分为：Service Definition（[dsh-whatsapp](../../packages/whatsapp/whatsapp)，`ctx.whatsapp` 与唯一的 provider 槽位）与 Service Provider（[dsh-whatsapp-baileys](../../packages/whatsapp/whatsapp-baileys)，一条 Baileys 连接）。WhatsApp 是可选能力，不属于 agent-loop 主干。
+WhatsApp seam —— 覆盖**一个已认证的个人 WhatsApp 账号**的[能力 seam](../glossary.md#capability-seam)，跨包拆分为：Service Definition（[dsh-whatsapp](../../packages/whatsapp/whatsapp)，`ctx.whatsapp` 与唯一的 provider 槽位）、Service Provider（[dsh-whatsapp-baileys](../../packages/whatsapp/whatsapp-baileys)，一条 Baileys 连接），以及两个消费方 —— [dsh-whatsapp-workspace](../../packages/whatsapp/whatsapp-workspace) 把入站消息流变成会话，[dsh-tool-whatsapp](../../packages/whatsapp/tool-whatsapp) 把账号以名称交给模型。WhatsApp 是可选能力，不属于 agent-loop 主干。
 
 来源：[`packages/whatsapp/whatsapp/src/types.ts`](../../packages/whatsapp/whatsapp/src/types.ts)
 
@@ -25,6 +25,22 @@ WhatsApp 账号不是按请求使用的凭据：它是一条长期存在的已�
 seam 不拥有任何消息数据库。`listChats` 与 `fetchMessages` 返回已注册 provider 所保留的内容，而随附的 Baileys provider 只保留其连接自加载以来观察到的内容，重启会将其丢弃。需要持久对话历史的消费者应记录抵达模型的内容，这正是 [model-visible ⟺ logged 规则](../architecture.md)已经要求的。
 
 因此当 provider 在重连后回放历史时，`whatsapp/message-received` 会重复某个 id：必须只处理一次的消费者要自行保存已处理 id 集合。`whatsapp/message-sent` 表示 WhatsApp 接受了该消息，而非它已送达或被阅读。
+
+## 一段对话就是工作区里的一个会话
+
+[dsh-whatsapp-workspace](../../packages/whatsapp/whatsapp-workspace) 给账号一个安身之处：一个通过 `ctx.workspaceRegistry` 注册的目录，于是 Web UI 中会在仓库工作区旁边出现一个 WhatsApp 工作区；其中的会话，其 `cwd` 就是那个目录。`route` 决定对话如何映射到会话 —— `category`（群聊与私聊）、`per-chat` 或 `single` —— 并且它是必填的，因为没有哪一种形态适合所有账号。
+
+分类路由或单会话路由意味着一个会话服务多段对话，因此对话身份不能是环境上下文。每条投递的消息都在模型读到的文本里携带它的对话种类、显示名与 `[chat_id: …]`，而那个 id 正是 `whatsapp_send_message` 所要求的：回复给对的人是复制，而不是推断。
+
+入站投递永不打断。轮次中途到达的消息会等待，通过维护路径认领 agent 的空闲阶段，并成为一个较晚的轮次；一阵突发合并为一次唤醒，同时仍保持每条消息一个轮次。「模型可见 ⟺ 已记录」在失败方向上成立 —— `whatsapp/inbound` 在轮次入队之前追加，因此日志拒绝的消息永远不会到达模型，而其后的队列继续前进。
+
+部署唯一永不路由的，是账号自己的消息。`fromMe` 既涵盖操作者在手机上打字，也涵盖 harness 自己被回送的回答；投递其中任何一种，都会用 agent 已经掌握的话唤醒它。seam 发布的其他一切都是某个人发出的，因此路由不需要任何别的内容判断。
+
+## 回复是逐条做出的决定
+
+[dsh-tool-whatsapp](../../packages/whatsapp/tool-whatsapp) 拥有面向模型的表面：`whatsapp_list_chats`、`whatsapp_read_chat`、`whatsapp_mark_read` 与 `whatsapp_send_message`。本子系统中任何地方都没有自动回复路径；被路由的消息抵达模型，之后的一切都是工具调用。
+
+每个指名对话的工具都必填 `chat_id`。它按 WhatsApp 地址校验，而不是在账号的对话列表里查找，因为那份列表以连接为界：provider 从观察到的活动构建它，刚连接时它为空，以它把关会让工具在每次重启后都不可用。发送还会带着完整指名的目的地询问 `ctx.approval`，并在拒绝、取消以及缺少审批通道时一律失败收场。一次确认的发送只在 provider 确认之后才追加 `whatsapp/outbound`，因此日志绝不会声称一次被 WhatsApp 拒绝的发送。
 
 ## 隐私与账号风险
 

@@ -41,6 +41,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
+| `@deepseek-ai/dsh-tool-whatsapp` | `whatsapp_list_chats`, `whatsapp_mark_read`, `whatsapp_read_chat`, `whatsapp_send_message` | `ctx.tools`, `ctx.whatsapp`, `ctx.approval (send only)` | `tool/call`, `whatsapp/outbound`, `tool/result` | - | whatsapp_send_message always requires chat_id and always asks ctx.approval before anything leaves the machine; the other three tools read the account without approval. |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
 
@@ -2219,3 +2220,111 @@ Search the web for current information. Provide 1–4 queries in the required qu
 Source: [`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.
+
+<a id="deepseek-aidsh-tool-whatsapp"></a>
+
+## `@deepseek-ai/dsh-tool-whatsapp`
+
+### `whatsapp_list_chats`
+
+List the WhatsApp conversations this account has observed since it connected, with their chat_id, display name, kind (direct or group), and unread count. This index is connection-scoped rather than a roster: it holds what this connection happens to have seen, which may be nothing. An empty result means nothing has been observed yet, NOT that the account has no conversations. A chat_id you already hold — from an incoming message or from the operator — stays usable even when it is absent here.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "unread_only": {
+      "type": "boolean",
+      "description": "Return only conversations with unread messages. Defaults to false."
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Maximum conversations to return (1-100). Defaults to 100."
+    }
+  }
+}
+```
+
+Source: [`packages/whatsapp/tool-whatsapp/src/index.ts`](../packages/whatsapp/tool-whatsapp/src/index.ts)
+
+### `whatsapp_mark_read`
+
+Mark ONE WhatsApp conversation read up to its newest message. The other participant sees the read receipt, so only mark a conversation you have actually read.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "chat_id": {
+      "type": "string",
+      "description": "The conversation to mark read, exactly as reported by whatsapp_list_chats or by an incoming message."
+    }
+  },
+  "required": [
+    "chat_id"
+  ]
+}
+```
+
+Source: [`packages/whatsapp/tool-whatsapp/src/index.ts`](../packages/whatsapp/tool-whatsapp/src/index.ts)
+
+### `whatsapp_read_chat`
+
+Read the recent messages of ONE WhatsApp conversation, newest first. Use it to catch up on a chat before answering it. chat_id must come from whatsapp_list_chats or from an incoming message. History is connection-scoped, so an empty result is a normal outcome: it means this connection has retained nothing for that chat, NOT that the conversation is empty or unreachable. A chat that reads empty can still be sent to.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "chat_id": {
+      "type": "string",
+      "description": "The conversation to read, exactly as reported by whatsapp_list_chats or by an incoming message."
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Maximum messages to return (1-100). Defaults to 20."
+    },
+    "before": {
+      "type": "string",
+      "description": "Return only messages older than this message_id, to page further back."
+    }
+  },
+  "required": [
+    "chat_id"
+  ]
+}
+```
+
+Source: [`packages/whatsapp/tool-whatsapp/src/index.ts`](../packages/whatsapp/tool-whatsapp/src/index.ts)
+
+### `whatsapp_send_message`
+
+Send ONE WhatsApp text message to an explicit conversation. chat_id is REQUIRED and must come from whatsapp_list_chats or from the [chat_id: ...] header of an incoming message — this tool never infers a recipient, and there is no "reply to the last chat". The user approves every send before it leaves the machine, and the approval prompt names the recipient.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "chat_id": {
+      "type": "string",
+      "description": "The conversation to send to, exactly as reported by whatsapp_list_chats or an incoming message."
+    },
+    "text": {
+      "type": "string",
+      "description": "The message body, as the recipient will read it (1-4096 characters)."
+    },
+    "quoted_message_id": {
+      "type": "string",
+      "description": "A message_id in the same conversation to quote, when the reply should be threaded."
+    }
+  },
+  "required": [
+    "chat_id",
+    "text"
+  ]
+}
+```
+
+Source: [`packages/whatsapp/tool-whatsapp/src/index.ts`](../packages/whatsapp/tool-whatsapp/src/index.ts)
+
+whatsapp_send_message always requires chat_id and always asks ctx.approval before anything leaves the machine; the other three tools read the account without approval.

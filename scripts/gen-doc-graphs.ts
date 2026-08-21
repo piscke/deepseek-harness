@@ -510,8 +510,8 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'WhatsApp account seam',
     mode: 'seam',
     implementations: ['whatsapp-baileys'],
-    consumers: [],
-    note: 'One registration owns one authenticated account, so the slot holds a single provider and status is part of the capability; no model-facing consumer ships yet.',
+    consumers: ['tool-whatsapp', 'whatsapp-workspace'],
+    note: 'One registration owns one authenticated account, so the slot holds a single provider and status is part of the capability; tool-whatsapp owns the model-facing names and whatsapp-workspace routes the inbound stream into sessions.',
   },
   {
     key: 'spillStore',
