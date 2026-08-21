@@ -16,7 +16,7 @@ WhatsApp provider 需要 Baileys —— 唯一仍在维护、可连接个人 Wha
 
 库缺失是一个正常且具名的结果：`WhatsAppError`，code 为 `WHATSAPP_BAILEYS_MISSING`，并附安装指引。provider 将自身标记为终止且不再重连，因为没有任何重试能安装一个包。此时 `ctx.whatsapp` 上报 `offline`，每个操作都失败于 `WHATSAPP_PROVIDER_UNAVAILABLE`。
 
-由于该库不在仓库中，测试改为针对 `WhatsAppSocket` 端口而非 Baileys 固定 provider：状态机、重连预算、消息规范化与对话索引均由 socket 替身覆盖。绑定后来在真实账号上跑通，确认了连接、配对与入站投递；发送、`markRead` 与历史翻页仍未针对该服务验证，包 README 对此直言不讳，而不是暗示其拥有并不具备的覆盖。
+由于该库不在仓库中，测试改为针对 `WhatsAppSocket` 端口而非 Baileys 固定 provider：状态机、重连预算、消息规范化与对话索引均由 socket 替身覆盖。绑定后来在真实账号上跑通，确认了 provider 提供的每一项操作，包 README 写明哪些覆盖来自自动化、哪些来自人工。
 
 ## 曾考虑的替代方案
 
@@ -34,6 +34,6 @@ WhatsApp provider 需要 Baileys —— 唯一仍在维护、可连接个人 Wha
 
 仓库保持 MIT，lockfile 中没有 GPL 包，而从不启用 WhatsApp 的成员在 `pnpm install` 上不付出任何代价。接受 Baileys 许可证与封号风险的位置是那次安装，而这正是该决定应有的归属。
 
-代价是一个类型上的空洞。Baileys 的表面由手写结构化接口描述，因此库的变更会在运行时而非 `tsc` 处崩溃，也没有任何 gate 会注意到被重命名的事件或选项。`WHATSAPP_BAILEYS_MISSING` 与 README 承载了编译器无法承载的部分。同样的缺席也意味着：provider 的首次真实配对就是它的首次真实测试。
+代价是一个类型上的空洞。Baileys 的表面由手写结构化接口描述，因此库的变更会在运行时而非 `tsc` 处崩溃，也没有任何 gate 会注意到被重命名的事件或选项。这个空洞并非假想：手写的 `sendMessage` 签名把被引用的消息声明为仅其 key，它通过了类型检查，也通过了断言引用 id 的测试，却在第一条真实的引用回复上于库内部崩溃 —— 因为 Baileys 会读取被引用消息自身的内容。`WHATSAPP_BAILEYS_MISSING` 与 README 承载了编译器无法承载的部分。同样的缺席也意味着：provider 的首次真实配对就是它的首次真实测试。
 
 这一模式可推广到任何 harness 包无法合法或安全地替所有人安装的 peer：让它不出现在任何清单字段中，通过校验过的配置指明它，动态加载它，并带着安装指引大声失败 —— 绝不静默降级。

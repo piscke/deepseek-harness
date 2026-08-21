@@ -16,7 +16,7 @@ Beyond licensing, an unofficial reverse-engineered client is a liability every w
 
 A missing library is a normal, named outcome: `WhatsAppError` with code `WHATSAPP_BAILEYS_MISSING` and an install instruction. The provider marks itself terminal and does not reconnect, because no retry can install a package. `ctx.whatsapp` then reports `offline` and every operation fails with `WHATSAPP_PROVIDER_UNAVAILABLE`.
 
-Because the library is absent from the repository, tests pin the provider against the `WhatsAppSocket` port rather than against Baileys: the status machine, reconnection budget, message normalization, and conversation index are covered by a socket double. The binding was later exercised against a real account, which confirmed connection, pairing, and inbound delivery; sending, `markRead`, and history paging remain unverified against the service, and the package README says so rather than implying coverage it does not have.
+Because the library is absent from the repository, tests pin the provider against the `WhatsAppSocket` port rather than against Baileys: the status machine, reconnection budget, message normalization, and conversation index are covered by a socket double. The binding was later exercised against a real account, which confirmed every operation the provider offers, and the package README says which coverage is automated and which is manual.
 
 ## Alternatives considered
 
@@ -34,6 +34,6 @@ Because the library is absent from the repository, tests pin the provider agains
 
 The repository stays MIT with no GPL package in its lockfile, and `pnpm install` costs nothing for members who never enable WhatsApp. The install is where a deployment accepts Baileys' license and its ban risk, which is where that decision belongs.
 
-The cost is a typed hole. Baileys' surface is described by hand-written structural interfaces, so a library change breaks at runtime rather than at `tsc`, and no gate notices a renamed event or option. `WHATSAPP_BAILEYS_MISSING` and the README carry what the compiler cannot. The same absence is why the provider's first real pairing is its first real test.
+The cost is a typed hole. Baileys' surface is described by hand-written structural interfaces, so a library change breaks at runtime rather than at `tsc`, and no gate notices a renamed event or option. The hole is not theoretical: the hand-written `sendMessage` signature declared the quoted message as its key alone, which typechecked, passed a test asserting the quoted id, and crashed inside the library on the first real quoted reply, because Baileys reads the quoted message's own body. `WHATSAPP_BAILEYS_MISSING` and the README carry what the compiler cannot. The same absence is why the provider's first real pairing is its first real test.
 
 This pattern generalizes to any peer a harness package cannot lawfully or safely install for everyone: keep it out of every manifest field, name it through validated config, load it dynamically, and fail loud with an install instruction — never silently degrade.

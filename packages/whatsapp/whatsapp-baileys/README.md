@@ -18,7 +18,7 @@ pnpm add baileys   # in the deployment, not in this repository
 
 Without it, connecting fails with `WHATSAPP_BAILEYS_MISSING`, the provider marks itself terminal, and no reconnection is attempted — no retry can install a package. `ctx.whatsapp` then reports `offline` and every operation fails with `WHATSAPP_PROVIDER_UNAVAILABLE`.
 
-Because Baileys is absent from the repository, everything here is pinned against the `WhatsAppSocket` port instead: the status machine, the reconnection policy, the message normalization, and the conversation index are covered by tests over a socket double. The binding to the real library is exercised only by hand: a live pairing has confirmed connect, QR, `online`, inbound messages, and credential-reusing reconnect, while `send`, `markRead`, and history paging remain untried against WhatsApp.
+Because Baileys is absent from the repository, everything here is pinned against the `WhatsAppSocket` port instead: the status machine, the reconnection policy, the message normalization, and the conversation index are covered by tests over a socket double. The binding to the real library is exercised only by hand, and a live account has now confirmed every operation this package offers — connect, QR, `online`, inbound messages, credential-reusing reconnect, `send`, quoting, `fetchMessages` with `before`, and `markRead`.
 
 ## Connection
 
@@ -57,7 +57,8 @@ No direct invalidation; the consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 
-- **The Baileys binding is outside CI** — every automated test drives a socket double. A manual live pairing has confirmed connect, QR, `online`, inbound messages, and reconnect from stored credentials; `send`, `markRead`, and history paging stay unconfirmed against the real service. The library is unofficial and reverse-engineered, so WhatsApp may ban the number or break the client at any time; use a dedicated test number.
+- **The Baileys binding is outside CI** — every automated test drives a socket double, and a live account has confirmed every operation by hand. The library is unofficial and reverse-engineered, so WhatsApp may ban the number or break the client at any time; use a dedicated test number.
+- **One process per `authDir`** — WhatsApp replaces an existing linked-device session, so a second process opening the same credentials closes the first with a `conflict` stream error. Give each connection its own directory.
 - **`listChats` starts empty on every connection** — the index is built from observed events, so a freshly connected process reports no conversations until messages arrive. A consumer that needs a durable roster keeps its own.
 - **History is per-process** — a restart loses the conversation index, and reconnection history replay repeats message ids a consumer already saw. A consumer that must act once keeps its own processed-id set.
 - **Group names are absent until observed** — a conversation's display name is derived from `pushName` on an inbound direct message, so a group's subject stays unresolved until the connection observes one.

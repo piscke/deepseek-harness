@@ -20,7 +20,7 @@ interface FakeSocket extends BaileysSocket {
   emitConnection(update: BaileysConnectionUpdate): void
   emitCreds(): void
   emitMessages(messages: readonly BaileysMessage[]): void
-  readonly sent: { jid: string; text: string; quoted: string | undefined }[]
+  readonly sent: { jid: string; text: string; quoted: BaileysMessage | undefined }[]
   readonly read: readonly BaileysMessage['key'][][]
   ended: boolean
 }
@@ -34,7 +34,7 @@ function makeModule(options: {
   const connectionListeners: ((update: BaileysConnectionUpdate) => void)[] = []
   const credsListeners: (() => void)[] = []
   const messageListeners: ((batch: { messages: readonly BaileysMessage[] }) => void)[] = []
-  const sent: { jid: string; text: string; quoted: string | undefined }[] = []
+  const sent: { jid: string; text: string; quoted: BaileysMessage | undefined }[] = []
   const read: BaileysMessage['key'][][] = []
 
   const socket: FakeSocket = {
@@ -49,7 +49,7 @@ function makeModule(options: {
       },
     },
     sendMessage: (jid, content, opts) => {
-      sent.push({ jid, text: content.text, quoted: opts?.quoted.key.id ?? undefined })
+      sent.push({ jid, text: content.text, quoted: opts?.quoted })
       return Promise.resolve('ack' in options ? options.ack : { key: { id: 'SENT1' }, messageTimestamp: 1_700_000_100 })
     },
     readMessages: (keys) => {
@@ -288,11 +288,13 @@ describe('sending', () => {
     expect(socket.sent).toEqual([{ jid: chatId, text: 'olá', quoted: undefined }])
   })
 
-  it('quotes a message this connection observed', async () => {
+  it('quotes a message this connection observed, body included', async () => {
     const { port, socket } = await open()
     socket.emitMessages([inbound()])
     await port.sendText({ chatId, text: 'claro', quotedMessageId: WhatsAppMessageId('M1') })
-    expect(socket.sent[0]?.quoted).toBe('M1')
+    // Baileys reads the quoted message's own body to build the reply context,
+    // so a quote carrying only the key crashes inside the library.
+    expect(socket.sent[0]?.quoted).toMatchObject({ key: { id: 'M1' }, message: { conversation: 'oi' } })
   })
 
   it('refuses to quote a message it never observed', async () => {

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-21-baileys-runtime-specifier.md
-2026-08-21-baileys-runtime-specifier.md: e955c796665e8cb93aec719ee526d39328f926e0
-2026-08-21-baileys-runtime-specifier.zh.md: cf454928960f0248336779cf104f0aae300c501a
+2026-08-21-baileys-runtime-specifier.md: 09e7f46e6139deefa4604025568c098144db8499
+2026-08-21-baileys-runtime-specifier.zh.md: 44767adc3f8944428d6494e7c5c8eafbbb0fa8bf

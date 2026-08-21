@@ -65,7 +65,7 @@ export interface BaileysSocket {
   sendMessage(
     jid: string,
     content: { text: string },
-    options?: { quoted: { key: BaileysKey } },
+    options?: { quoted: BaileysMessage },
   ): Promise<BaileysMessage | undefined>
   readMessages(keys: readonly BaileysKey[]): Promise<void>
   end(error: Error | undefined): void
@@ -183,7 +183,7 @@ function bindSocket(
 ): WhatsAppSocket {
   // Baileys exposes no message store, so the binding retains the keys that
   // quoting and read receipts need from the messages it has observed.
-  const keyById = new Map<string, BaileysKey>()
+  const messageById = new Map<string, BaileysMessage>()
   const newestKeyByChat = new Map<string, BaileysKey>()
 
   socket.ev.on('creds.update', () => void saveCreds())
@@ -206,7 +206,7 @@ function bindSocket(
     for (const raw of batch.messages) {
       const message = normalizeMessage(raw)
       if (message === undefined) continue
-      keyById.set(message.id, raw.key)
+      messageById.set(message.id, raw)
       newestKeyByChat.set(message.chatId, raw.key)
       onEvent({ kind: 'message', message })
     }
@@ -217,7 +217,7 @@ function bindSocket(
       const acknowledged = await socket.sendMessage(
         request.chatId,
         { text: request.text },
-        ...quotedOptions(request, keyById),
+        ...quotedOptions(request, messageById),
       )
       const id = acknowledged?.key.id
       if (id === null || id === undefined) {
@@ -246,21 +246,27 @@ function bindSocket(
   }
 }
 
-/** Resolve the optional quoted message into `sendMessage` options. */
+/**
+ * Resolve the optional quoted message into `sendMessage` options.
+ *
+ * Baileys reads the quoted message's own body to build the reply context, so
+ * the whole message goes back rather than its key. Only a message that passed
+ * normalization is indexed, so a quoted message always has content.
+ */
 function quotedOptions(
   request: WhatsAppSendRequest,
-  keyById: ReadonlyMap<string, BaileysKey>,
-): [] | [{ quoted: { key: BaileysKey } }] {
+  messageById: ReadonlyMap<string, BaileysMessage>,
+): [] | [{ quoted: BaileysMessage }] {
   const { quotedMessageId } = request
   if (quotedMessageId === undefined) return []
-  const key = keyById.get(quotedMessageId)
-  if (key === undefined) {
+  const quoted = messageById.get(quotedMessageId)
+  if (quoted === undefined) {
     throw new WhatsAppError(
       `message "${quotedMessageId}" was never observed by this connection, so it cannot be quoted`,
       'WHATSAPP_UNKNOWN_MESSAGE',
     )
   }
-  return [{ quoted: { key } }]
+  return [{ quoted }]
 }
 
 /**
