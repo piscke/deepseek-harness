@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/whatsapp/whatsapp-baileys/README.md
-README.md: be6600af7b710a0f685b24440271fdf33ac0b455
-README.zh.md: d94bd474bd9d5942066a3485db66a9ee7ad3eb11
+README.md: 9fd4f584ad397321a2ff02d305e5ad59ab3f2f74
+README.zh.md: 821c11a76812cb8007b4f35462a92d4201ca0f50

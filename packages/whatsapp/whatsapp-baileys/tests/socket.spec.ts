@@ -216,6 +216,12 @@ describe('message normalization', () => {
     expect(events[0]).not.toHaveProperty('message.senderName')
   })
 
+  it('classifies an address space it does not recognize as a direct conversation', async () => {
+    const { socket, events } = await open()
+    socket.emitMessages([inbound({ key: { id: 'M9', remoteJid: '94257503293551@lid' } })])
+    expect(events[0]).toMatchObject({ message: { chatKind: 'direct', chatId: '94257503293551@lid' } })
+  })
+
   it('reports media it cannot represent instead of dropping the message', async () => {
     const { socket, events } = await open()
     socket.emitMessages([

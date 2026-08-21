@@ -16,7 +16,7 @@ WhatsApp 账号不是按请求使用的凭据：它是一条长期存在的已�
 
 `WhatsAppMessage` 携带 branded 的 `WhatsAppMessageId`、所属 `WhatsAppChatId`、对话是 `direct` 还是 `group`、作者、是否由已连接账号所写（`fromMe`，包括来自其他设备）、RFC 3339 UTC 时间戳，以及 `WhatsAppContent` 正文。内容是 `text` 与 `unsupported` 的封闭联合 —— provider 会把无法表示的媒体连同其媒体类型一并报告，而不是丢弃消息，使消费者仍能看到确有内容到达并据此回复。
 
-对话类型是路由的判别式，因此无法归类某个对话的 provider 必须失败，而不是猜测。
+对话类型是路由的判别式，且归属于 provider：它为自己报告的每个对话完成分类，消费者读取 `kind`，而不是从地址重新推导。WhatsApp 通过多个域为会话编址，并会不断新增，因此 provider 会把陌生域归类为 `direct` 而非失败 —— 一旦 WhatsApp 推出新的地址空间，fail-closed 的 provider 会立刻失明，而自行解析地址的消费者则会拒绝 provider 合法报告的 id。
 
 `whatsapp/message-received` 意味着有人发送了内容。无人撰写的帧 —— 投递元数据，或撤回、历史同步通知一类的协议事务 —— 不是消息，provider 会将其丢弃，而不是以某个媒体类型将其发布，因此没有任何消费者需要知道某个 WhatsApp 字段名才能避开管道层的东西。
 

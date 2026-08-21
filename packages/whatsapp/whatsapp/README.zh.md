@@ -35,6 +35,8 @@ WhatsApp 能力 seam（`ctx.whatsapp`）：在恰好一个已认证账号之上�
 
 `WhatsAppChatId` 与 `WhatsAppMessageId` 是 branded 字符串：对话 id 是账号可见的会话地址，消息 id 不透明，且只对观察到它的那条连接有意义。
 
+对话 id 同样不透明。WhatsApp 通过多个域为会话编址，并会不断新增 —— 线上账号会把一对一对话同时报告为 `@s.whatsapp.net` 与 `@lid`，此外还并存 `@newsletter` 与 `@broadcast` —— 因此消费者不得解析对话 id，也不得用封闭的后缀集合去分类它。`WhatsAppChat.kind` 与 `WhatsAppMessage.chatKind` 已经携带该分类，由跟踪 WhatsApp 地址空间的 provider 判定；自行重新推导的消费者会拒绝 provider 合法报告的地址。
+
 ## 模型体验
 
 通过把这些对话呈现给模型的消费者间接影响；本包不注册任何工具、提示词或 schema，而这样的消费者包含的一切都会到达 LLM 供应商与会话日志。

@@ -16,7 +16,7 @@ A WhatsApp account is not a per-request credential: it is a long-lived authentic
 
 `WhatsAppMessage` carries a branded `WhatsAppMessageId`, its `WhatsAppChatId`, whether the conversation is `direct` or `group`, the author, whether the connected account wrote it (`fromMe`, including from another device), an RFC 3339 UTC timestamp, and a `WhatsAppContent` body. Content is a closed union of `text` and `unsupported` — a provider reports media it cannot represent with its media type rather than dropping the message, so a consumer still sees that something arrived and can answer accordingly.
 
-Chat kind is the routing discriminator, so a provider that cannot classify a conversation must fail rather than guess.
+Chat kind is the routing discriminator, and the provider owns it: it classifies every conversation it reports, and a consumer reads `kind` rather than re-deriving it from the address. WhatsApp addresses conversations through several domains and adds more over time, so a provider classifies an unfamiliar domain as `direct` rather than failing — a fail-closed provider goes dark the moment WhatsApp rolls out a new address space, and a consumer that parses the address instead rejects ids the provider legitimately reports.
 
 `whatsapp/message-received` means a person sent something. A frame nobody authored — delivery metadata, or protocol housekeeping such as a revocation or a history-sync notification — is not a message, and a provider drops it rather than publishing it under a media type, so no consumer needs to know a WhatsApp field name to avoid answering plumbing.
 

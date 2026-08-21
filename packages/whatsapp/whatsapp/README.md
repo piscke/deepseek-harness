@@ -35,6 +35,8 @@ Acknowledgement means WhatsApp accepted the message, not that it was delivered o
 
 `WhatsAppChatId` and `WhatsAppMessageId` are branded strings: a chat id is the account-visible conversation address, a message id is opaque and only meaningful to the connection that observed it.
 
+A chat id is opaque too. WhatsApp addresses conversations through several domains and adds more over time — a live account reports direct conversations as both `@s.whatsapp.net` and `@lid`, and `@newsletter` and `@broadcast` exist beside them — so a consumer must not parse a chat id, and must not classify one against a closed set of suffixes. `WhatsAppChat.kind` and `WhatsAppMessage.chatKind` already carry the classification, decided by the provider that tracks WhatsApp's address spaces; a consumer that re-derives it rejects addresses the provider legitimately reports.
+
 ## Model Experience
 
 Indirectly, through whichever consumer puts these conversations in front of a model; this package registers no tool, prompt, or schema, and everything such a consumer includes reaches the LLM provider and the session log.
