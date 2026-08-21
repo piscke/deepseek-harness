@@ -18,7 +18,9 @@ pnpm add baileys   # in the deployment, not in this repository
 
 Without it, connecting fails with `WHATSAPP_BAILEYS_MISSING`, the provider marks itself terminal, and no reconnection is attempted — no retry can install a package. `ctx.whatsapp` then reports `offline` and every operation fails with `WHATSAPP_PROVIDER_UNAVAILABLE`.
 
-Because Baileys is absent from the repository, everything here is pinned against the `WhatsAppSocket` port instead: the status machine, the reconnection policy, the message normalization, and the conversation index are covered by tests over a socket double. The binding to the real library is exercised only by hand, and a live account has now confirmed every operation this package offers — connect, QR, `online`, inbound messages, credential-reusing reconnect, `send`, quoting, `fetchMessages` with `before`, and `markRead`.
+Because Baileys is absent from the repository, everything here is pinned against the `WhatsAppSocket` port instead: the status machine, the reconnection policy, the message normalization, and the conversation index are covered by tests over a socket double. The binding to the real library is exercised only by hand.
+
+A live account has confirmed connect, QR, `online`, inbound messages, credential-reusing reconnect, `send`, quoting, `fetchMessages` with `before`, `markRead`, and the refusal to connect over a damaged credential file. Four things rest on tests alone, because the account lost its pairing before they could be exercised: `resolveChat`, the empty page a never-observed address reads back, the account id with its device suffix stripped, and every `unsupported` media type — no real media ever arrived.
 
 ## Connection
 

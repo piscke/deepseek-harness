@@ -18,7 +18,9 @@ pnpm add baileys   # in the deployment, not in this repository
 
 缺少它时，连接失败于 `WHATSAPP_BAILEYS_MISSING`，provider 将自身标记为终止，并且不再尝试重连 —— 没有任何重试能安装一个包。此时 `ctx.whatsapp` 上报 `offline`，每个操作都失败于 `WHATSAPP_PROVIDER_UNAVAILABLE`。
 
-由于 Baileys 不在仓库中，这里的一切改为针对 `WhatsAppSocket` 端口固定下来：状态机、重连策略、消息规范化与对话索引都由基于 socket 替身的测试覆盖。与真实库的绑定只由人工验证，如今一个真实账号已确认本包提供的每一项操作 —— 连接、二维码、`online`、入站消息、凭据复用重连、`send`、引用回复、带 `before` 的 `fetchMessages` 以及 `markRead`。
+由于 Baileys 不在仓库中，这里的一切改为针对 `WhatsAppSocket` 端口固定下来：状态机、重连策略、消息规范化与对话索引都由基于 socket 替身的测试覆盖。与真实库的绑定只由人工验证。
+
+一个真实账号已确认：连接、二维码、`online`、入站消息、凭据复用重连、`send`、引用回复、带 `before` 的 `fetchMessages`、`markRead`，以及在损坏的凭据文件上拒绝连接。另有四项只靠测试支撑，因为账号在它们能被实际执行之前就丢失了配对：`resolveChat`、从未观察过的地址读回的空页、去掉设备后缀的账号 id，以及每一种 `unsupported` 媒体类型 —— 真实媒体从未到达过。
 
 ## 连接
 
