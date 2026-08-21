@@ -18,11 +18,13 @@ pnpm add baileys   # in the deployment, not in this repository
 
 缺少它时，连接失败于 `WHATSAPP_BAILEYS_MISSING`，provider 将自身标记为终止，并且不再尝试重连 —— 没有任何重试能安装一个包。此时 `ctx.whatsapp` 上报 `offline`，每个操作都失败于 `WHATSAPP_PROVIDER_UNAVAILABLE`。
 
-由于 Baileys 不在仓库中，这里的一切改为针对 `WhatsAppSocket` 端口固定下来：状态机、重连策略、消息规范化与对话索引都由基于 socket 替身的测试覆盖。与真实库的绑定只由人工验证，如今一个真实账号已确认本包提供的每一项操作 —— 连接、二维码、`online`、入站消息、凭据复用重连、`send`、引用回复、带 `before` 的 `fetchMessages` 以及 `markRead`。
+由于 Baileys 不在仓库中，这里的一切改为针对 `WhatsAppSocket` 端口固定下来：状态机、重连策略、消息规范化与对话索引都由基于 socket 替身的测试覆盖。与真实库的绑定只由人工验证。
+
+一个真实账号已确认：连接、二维码、`online`、入站消息、凭据复用重连、`send`、引用回复、带 `before` 的 `fetchMessages`、`markRead`，以及在损坏的凭据文件上拒绝连接。另有四项只靠测试支撑，因为账号在它们能被实际执行之前就丢失了配对：`resolveChat`、从未观察过的地址读回的空页、去掉设备后缀的账号 id，以及每一种 `unsupported` 媒体类型 —— 真实媒体从未到达过。
 
 ## 连接
 
-provider 拥有一条连接的生命周期。它在插件加载时立即打开，并通过 `status()` 与 `whatsapp/status` 上报进展：先 `connecting`，再是携带人工扫描 QR 负载的 `pairing`，随后是带账号 id 的 `online`。意外关闭会在 `reconnectDelay` 之后重开，直到连续 `maxReconnectAttempts` 次尝试耗尽，此后 provider 停止并报告 `WHATSAPP_RECONNECT_EXHAUSTED`。已登出导致的关闭是终止性的：凭据已失效，因此直接进入 `logged-out` 而不重试。
+provider 拥有一条连接的生命周期。它在插件加载时立即打开，并通过 `status()` 与 `whatsapp/status` 上报进展：先 `connecting`，再是携带人工扫描 QR 负载的 `pairing`，随后是指明账号的 `online`。Baileys 上报的是所链接**设备**的地址，其 `:<device>` 后缀在同一账号每次重新配对时都会改变，因此该后缀被去掉，使这个 id 指向账号本身；若某次连接根本没有上报地址，则 `accountId` 保持缺席，而不是携带一个占位值。意外关闭会在 `reconnectDelay` 之后重开，直到连续 `maxReconnectAttempts` 次尝试耗尽，此后 provider 停止并报告 `WHATSAPP_RECONNECT_EXHAUSTED`。已登出导致的关闭是终止性的：凭据已失效，因此直接进入 `logged-out` 而不重试。
 
 拆解顺序为 LIFO —— 连接先于注册被撤回而关闭，因此不会有任何调用派发到正在关闭的 socket 上。
 
@@ -61,7 +63,7 @@ Baileys 不提供 message store，因此 `listChats` 与 `fetchMessages` 只回�
 
 ## 已知限制与暂缓事项
 
-- **Baileys 绑定不在 CI 内** —— 每个自动化测试都驱动 socket 替身，且一个真实账号已人工确认每一项操作。该库为非官方逆向工程实现，WhatsApp 可能随时封禁号码或使客户端失效；请使用专用测试号码。
+- **Baileys 绑定不在 CI 内** —— 每个自动化测试都驱动 socket 替身，且一个真实账号已人工确认上文列出的那些操作，而非全部操作。该库为非官方逆向工程实现，WhatsApp 可能随时封禁号码或使客户端失效；请使用专用测试号码。
 - **每个 `authDir` 只允许一个进程** —— WhatsApp 会替换既有的已链接设备会话，因此第二个进程打开同一份凭据会以 `conflict` 流错误关闭第一个，而两个互不同步的凭据写入方还可能把文件写成截断状态，导致配对丢失。目前没有任何机制强制这种独占；对该目录加建议锁属于待办工作。请为每条连接分配各自的目录。
 - **`listChats` 只报告本连接观察到的内容** —— 索引由观察到的事件构建，从不来自名册拉取，因此不含进程未见过的对话。它在连接时并不必然为空：WhatsApp 会在握手期间重放离线流量，已配对账号曾在首次调用时就报告出对话。消费者既不能假定索引为空，也不能假定它完整；需要持久性时自行保存名册。
 - **对话 id 不透明，且未必是电话号码** —— WhatsApp 通过不止一个域为一对一对话编址；已观察到线上账号将一个具名对话报告为 `<id>@lid`，即其链接身份地址空间，此外还存在 `@newsletter` 与 `@broadcast`。本 provider 将 `@g.us` 视为群组域，其余一律视为一对一，因此新增地址空间会退化为可用的分类而非报错。消费者必须把 `WhatsAppChatId` 当作不透明值：用封闭的后缀集合去解析它，会拒绝本 provider 合法报告的地址。

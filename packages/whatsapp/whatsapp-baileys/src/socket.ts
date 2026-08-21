@@ -46,6 +46,26 @@ export function chatKindOf(jid: string): WhatsAppChatKind {
   return jid.endsWith(GROUP_JID_SUFFIX) ? 'group' : 'direct'
 }
 
+/**
+ * Name the account behind a connection's own address.
+ *
+ * Baileys reports the address of the *linked device*, suffixing the user with
+ * `:<device>`, which changes every time the same account pairs again. The
+ * suffix is dropped so the id names the account across relinks. A connection
+ * that reports no address at all yields nothing rather than a placeholder,
+ * because an invented id would compare equal across two different accounts.
+ * @param jid - the connection's own address, absent when the library has none.
+ * @returns the `accountId` field, or nothing to leave it absent.
+ */
+export function accountIdOf(jid: string | undefined): { accountId?: string } {
+  if (jid === undefined) return {}
+  const at = jid.indexOf('@')
+  if (at === -1) return { accountId: jid }
+  const user = jid.slice(0, at)
+  const device = user.indexOf(':')
+  return { accountId: `${device === -1 ? user : user.slice(0, device)}${jid.slice(at)}` }
+}
+
 /** Addressing fields Baileys attaches to every message. */
 export interface BaileysKey {
   readonly id?: string | null
@@ -115,7 +135,7 @@ export interface BaileysModule {
 export type SocketEvent =
   | { readonly kind: 'connecting' }
   | { readonly kind: 'pairing'; readonly qr: string }
-  | { readonly kind: 'open'; readonly accountId: string }
+  | { readonly kind: 'open'; readonly accountId?: string }
   | { readonly kind: 'closed'; readonly loggedOut: boolean; readonly reason: string }
   | { readonly kind: 'message'; readonly message: WhatsAppMessage }
 
@@ -244,7 +264,7 @@ function bindSocket(
   socket.ev.on('connection.update', (update) => {
     if (update.qr !== undefined) onEvent({ kind: 'pairing', qr: update.qr })
     if (update.connection === 'connecting') onEvent({ kind: 'connecting' })
-    if (update.connection === 'open') onEvent({ kind: 'open', accountId: socket.user?.id ?? 'unknown' })
+    if (update.connection === 'open') onEvent({ kind: 'open', ...accountIdOf(socket.user?.id) })
     if (update.connection === 'close') {
       const statusCode = update.lastDisconnect?.error?.output?.statusCode
       onEvent({

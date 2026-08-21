@@ -22,6 +22,8 @@ WhatsApp 能力 seam（`ctx.whatsapp`）：在恰好一个已认证账号之上�
 
 `send` 在抵达 provider 之前就拒绝空白正文（`WHATSAPP_EMPTY_MESSAGE`），`fetchMessages` 同样先拒绝非正数或带小数的 `limit`（`WHATSAPP_INVALID_LIMIT`），因此 provider 无需自行定义这些含义。
 
+`pairing` 负载是一份凭据，而不是进度细节：扫描它的人会链接一台拥有账号完全访问权的设备，其敏感程度高于任何消息正文。展示或转发它的界面，就是在决定谁能看到它。`online` 指明的是账号本身，而不是它所经由的设备；当 provider 无法上报时，它宁可略去这个名字，也不会凭空造一个。
+
 ## 事件
 
 | 事件 | 触发时机 |

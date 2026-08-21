@@ -191,7 +191,7 @@ export class BaileysProvider implements WhatsAppProvider {
         return
       case 'open':
         this.attempts = 0
-        this.setStatus({ state: 'online', accountId: event.accountId })
+        this.setStatus({ state: 'online', ...event.accountId === undefined ? {} : { accountId: event.accountId } })
         return
       case 'closed':
         this.socket = undefined

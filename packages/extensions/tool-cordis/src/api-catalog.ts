@@ -4898,7 +4898,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WhatsAppStatus',
-    declaration: 'export type WhatsAppStatus = {\n    readonly state: \'offline\';\n} | {\n    readonly state: \'connecting\';\n} | {\n    readonly state: \'pairing\';\n    readonly qr: string;\n} | {\n    readonly state: \'online\';\n    readonly accountId: string;\n} | {\n    readonly state: \'logged-out\';\n    readonly reason: string;\n};',
+    declaration: 'export type WhatsAppStatus = {\n    readonly state: \'offline\';\n} | {\n    readonly state: \'connecting\';\n} | {\n    readonly state: \'pairing\';\n    readonly qr: string;\n} | {\n    readonly state: \'online\';\n    readonly accountId?: string;\n} | {\n    readonly state: \'logged-out\';\n    readonly reason: string;\n};',
   },
   {
     name: 'WorkflowAgentEndInfo',

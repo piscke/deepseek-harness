@@ -166,7 +166,7 @@ describe('stored pairing', () => {
 })
 
 describe('connection stream', () => {
-  it('reports connecting, pairing, and the connected account', async () => {
+  it('reports connecting, pairing, and the account behind the connected device', async () => {
     const { socket, events } = await open()
     socket.emitConnection({ connection: 'connecting' })
     socket.emitConnection({ qr: 'QR-1' })
@@ -174,14 +174,26 @@ describe('connection stream', () => {
     expect(events).toEqual([
       { kind: 'connecting' },
       { kind: 'pairing', qr: 'QR-1' },
-      { kind: 'open', accountId: '5511888880000:1@s.whatsapp.net' },
+      { kind: 'open', accountId: '5511888880000@s.whatsapp.net' },
     ])
   })
 
-  it('names the account unknown when the library reports none', async () => {
+  it('reports an address carrying no device suffix unchanged', async () => {
+    const { socket, events } = await open({ user: { id: '5511888880000@s.whatsapp.net' } })
+    socket.emitConnection({ connection: 'open' })
+    expect(events).toEqual([{ kind: 'open', accountId: '5511888880000@s.whatsapp.net' }])
+  })
+
+  it('reports an address it cannot split unchanged', async () => {
+    const { socket, events } = await open({ user: { id: 'opaque-identity' } })
+    socket.emitConnection({ connection: 'open' })
+    expect(events).toEqual([{ kind: 'open', accountId: 'opaque-identity' }])
+  })
+
+  it('leaves the account unnamed when the library reports no address', async () => {
     const { socket, events } = await open({ user: undefined })
     socket.emitConnection({ connection: 'open' })
-    expect(events).toEqual([{ kind: 'open', accountId: 'unknown' }])
+    expect(events).toEqual([{ kind: 'open' }])
   })
 
   it('distinguishes a logged-out close from a transient one', async () => {

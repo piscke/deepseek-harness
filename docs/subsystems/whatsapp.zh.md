@@ -155,7 +155,7 @@ One message was observed in a chat, including messages the connected account sen
 'whatsapp/message-received'(message: WhatsAppMessage): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:169`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:173`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappmessage-sent--emit"></a>
 
@@ -174,7 +174,7 @@ The provider acknowledged one send requested through `ctx.whatsapp`. Acknowledge
 'whatsapp/message-sent'(message: WhatsAppSentMessage): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:177`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:181`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappstatus--emit"></a>
 
@@ -193,5 +193,5 @@ The account's connection state changed, emitted once per transition. A `pairing`
 'whatsapp/status'(status: WhatsAppStatus): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:159`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:163`](../../packages/whatsapp/whatsapp/src/types.ts)
 <!-- END GENERATED cordis-surface -->
