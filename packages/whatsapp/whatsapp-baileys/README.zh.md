@@ -18,7 +18,7 @@ pnpm add baileys   # in the deployment, not in this repository
 
 缺少它时，连接失败于 `WHATSAPP_BAILEYS_MISSING`，provider 将自身标记为终止，并且不再尝试重连 —— 没有任何重试能安装一个包。此时 `ctx.whatsapp` 上报 `offline`，每个操作都失败于 `WHATSAPP_PROVIDER_UNAVAILABLE`。
 
-由于 Baileys 不在仓库中，这里的一切改为针对 `WhatsAppSocket` 端口固定下来：状态机、重连策略、消息规范化与对话索引都由基于 socket 替身的测试覆盖，而**与真实库的绑定从未对 WhatsApp 运行过**。请把首次真实配对当作未经测试的一步。
+由于 Baileys 不在仓库中，这里的一切改为针对 `WhatsAppSocket` 端口固定下来：状态机、重连策略、消息规范化与对话索引都由基于 socket 替身的测试覆盖。与真实库的绑定只由人工验证：一次真实配对已确认连接、二维码、`online`、入站消息以及凭据复用重连，而 `send`、`markRead` 与历史翻页仍未对 WhatsApp 试过。
 
 ## 连接
 
@@ -57,7 +57,8 @@ Baileys 不提供 message store，因此 `listChats` 与 `fetchMessages` 只回�
 
 ## 已知限制与暂缓事项
 
-- **Baileys 绑定未针对真实库验证** —— 每个测试都驱动 socket 替身，也未进行过真实配对。该库为非官方逆向工程实现，WhatsApp 可能随时封禁号码或使客户端失效；请使用专用测试号码。
+- **Baileys 绑定不在 CI 内** —— 每个自动化测试都驱动 socket 替身。一次人工真实配对已确认连接、二维码、`online`、入站消息以及凭据复用重连；`send`、`markRead` 与历史翻页对真实服务仍未确认。该库为非官方逆向工程实现，WhatsApp 可能随时封禁号码或使客户端失效；请使用专用测试号码。
+- **`listChats` 在每条连接上都从空开始** —— 索引由观察到的事件构建，因此刚连接的进程在消息到达前不报告任何对话。需要持久名册的消费者自行保存。
 - **历史仅存在于进程内** —— 重启会丢失对话索引，重连时的历史回放会重复消费者已见过的消息 id。必须只处理一次的消费者要自行保存已处理 id 集合。
 - **群名在被观察到之前缺失** —— 对话显示名派生自入站直聊消息上的 `pushName`，因此群主题在连接观察到之前一直无法解析。
 - **仅文本、无在线状态** —— 发送媒体、下载媒体、输入指示与送达回执均属推迟的工作。
