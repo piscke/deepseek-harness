@@ -53,14 +53,15 @@ describe('whatsapp-assistant example overlay', () => {
 
   it('routes conversations by category, which is what makes the two standing sessions appear', () => {
     const workspace = rows.find(row => row.id === 'whatsapp-workspace')
-    expect(workspace?.config).toEqual({ route: 'category' })
+    expect(workspace?.config?.route).toBe('category')
   })
 
-  it('pins the credential directory under the harness home so one DSH_HOME means one connection', () => {
-    // WhatsApp replaces a linked device, so two processes sharing `authDir`
-    // close each other. The provider's own default is cwd-relative, which makes
-    // that collision depend on where the operator happened to start `dsh`.
+  it('anchors both the credentials and the conversation directory to the same harness home', () => {
+    // The provider's `authDir` default is cwd-relative and the router's
+    // `directory` default ignores DSH_HOME entirely, so a second account would
+    // otherwise split across two homes.
     expect(source).toContain("authDir: !!js dshHomePath('whatsapp', 'auth')")
+    expect(source).toContain("directory: !!js dshHomePath('whatsapp', 'chats')")
   })
 
   it('names the operator-installed library through the environment, defaulting to the bare specifier', () => {

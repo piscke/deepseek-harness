@@ -16,7 +16,7 @@ Two constraints make that composition unusual. `baileys` cannot be a dependency 
 
 The overlay makes two decisions the provider's own defaults leave open.
 
-`authDir` is pinned to `dshHomePath('whatsapp', 'auth')` instead of the provider's cwd-relative default. The one-connection rule is a property of the credential directory, and a cwd-relative default makes collisions depend on where the operator happened to start `dsh`. Anchored to the harness home, the rule an operator has to keep becomes "one `dsh web` per `DSH_HOME`", which is checkable without knowing anything about linked devices.
+`authDir` is pinned to `dshHomePath('whatsapp', 'auth')` instead of the provider's cwd-relative default, and the router's `directory` to `dshHomePath('whatsapp', 'chats')` instead of its `~/.dsh/whatsapp` default. The one-connection rule is a property of the credential directory, and a cwd-relative default makes collisions depend on where the operator happened to start `dsh`; a router default that ignores `DSH_HOME` would leave a second account's conversations in the first one's directory while its credentials moved. Anchored to the harness home, the rule an operator has to keep becomes "one `dsh web` per `DSH_HOME`", which is checkable without knowing anything about linked devices.
 
 `moduleSpecifier` reads `DSH_WHATSAPP_BAILEYS`, defaulting to the bare `baileys`. The operator installs the library outside this workspace, so the composition has to accept an absolute location; the value is passed to a dynamic `import()`, which is why the README specifies a `file:` URL rather than a filesystem path. A library that does not resolve is the named outcome `WHATSAPP_BAILEYS_MISSING` ([runtime specifier](../architecture/2026-08-21-baileys-runtime-specifier.md)).
 

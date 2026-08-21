@@ -24,9 +24,9 @@ Then name that install in `DSH_WHATSAPP_BAILEYS`. The value is a module specifie
 
 ## Pair the account, once per process
 
-The overlay pins the credential directory to `$DSH_HOME/whatsapp/auth`. Start the process, open the Session log of any WhatsApp Session, and scan the QR from the linked-device screen of the WhatsApp app. The QR rotates until it is scanned.
+The overlay pins the credential directory to `$DSH_HOME/whatsapp/auth` and the routed conversations to `$DSH_HOME/whatsapp/chats`. Start the process, open the Session log of any WhatsApp Session, and scan the QR from the linked-device screen of the WhatsApp app. The QR rotates until it is scanned.
 
-WhatsApp allows one connection per linked device, and a new connection *replaces* the old one. A second process on the same credential directory therefore kills the first with a `conflict` stream error, and both then fight over the account. Because the directory follows `DSH_HOME`, the rule to keep is: **one `dsh web` per `DSH_HOME`.** Run a second account from a second `DSH_HOME`, never from a second process against the same one.
+WhatsApp allows one connection per linked device, and a new connection *replaces* the old one. A second process on the same credential directory therefore kills the first with a `conflict` stream error, and both then fight over the account. Because both directories follow `DSH_HOME`, the rule to keep is: **one `dsh web` per `DSH_HOME`.** Run a second account from a second `DSH_HOME`, never from a second process against the same one. A second account is a second linked device, so it needs its own QR scan rather than a copy of the first one's credentials.
 
 ## What the operator sees
 

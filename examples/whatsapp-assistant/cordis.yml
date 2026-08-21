@@ -33,6 +33,11 @@
       name: '@deepseek-ai/dsh-whatsapp-workspace'
       config:
         route: category
+        # Under the harness home for the same reason as `authDir`: the router's
+        # own default is `~/.dsh/whatsapp` regardless of DSH_HOME, which would
+        # leave a second account's conversations in the first one's directory
+        # while its credentials moved.
+        directory: !!js dshHomePath('whatsapp', 'chats')
 
     # A host-plane row rather than a preset row: the Web profile mounts
     # model-facing tools behind agent presets, and a scoped registration

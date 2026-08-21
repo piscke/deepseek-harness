@@ -16,7 +16,7 @@ WhatsApp 能力接缝、它的 Baileys 提供方、工作区路由器，以及�
 
 覆盖层作出了两项提供方默认值未决定的选择。
 
-`authDir` 被固定为 `dshHomePath('whatsapp', 'auth')`，而非提供方相对 cwd 的默认值。「只允许一个连接」这条规则依附于凭据目录，而相对 cwd 的默认值会让冲突取决于操作者恰好在哪里启动 `dsh`。锚定到 Harness home 之后，操作者需要遵守的规则就变成「每个 `DSH_HOME` 只跑一个 `dsh web`」，这一点无需了解链接设备也能核对。
+`authDir` 被固定为 `dshHomePath('whatsapp', 'auth')` 而非提供方相对 cwd 的默认值，路由器的 `directory` 也被固定为 `dshHomePath('whatsapp', 'chats')` 而非其 `~/.dsh/whatsapp` 默认值。「只允许一个连接」这条规则依附于凭据目录，而相对 cwd 的默认值会让冲突取决于操作者恰好在哪里启动 `dsh`；一个忽略 `DSH_HOME` 的路由器默认值则会在凭据已经搬走之后，把第二个账号的会话留在第一个账号的目录里。锚定到 Harness home 之后，操作者需要遵守的规则就变成「每个 `DSH_HOME` 只跑一个 `dsh web`」，这一点无需了解链接设备也能核对。
 
 `moduleSpecifier` 读取 `DSH_WHATSAPP_BAILEYS`，默认为裸写的 `baileys`。该库由操作者安装在本工作区之外，因此组合必须接受一个绝对位置；该值会被传给动态 `import()`，这也是 README 要求使用 `file:` URL 而非文件系统路径的原因。无法解析的库对应具名结果 `WHATSAPP_BAILEYS_MISSING`（[运行时说明符](../architecture/2026-08-21-baileys-runtime-specifier.md)）。
 
