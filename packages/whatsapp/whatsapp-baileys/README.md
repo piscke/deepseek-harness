@@ -32,7 +32,7 @@ Auth state is a mutable multi-file directory (`authDir`), not a credential refer
 
 Baileys ships no message store, so `listChats` and `fetchMessages` answer from what **this connection observed since it loaded**: both are empty right after a restart and grow as messages arrive. `listChats` orders by newest observed message; `fetchMessages` returns newest-first and pages with `before`. A chat this connection never observed fails with `WHATSAPP_UNKNOWN_CHAT` rather than returning an empty page, because an empty page and an unknown address are different answers. Per-chat retention is capped by `historyPerChat`, evicting oldest-first.
 
-A message with no id, no chat address, or no content is a protocol frame rather than a conversation message and is discarded. Media the seam cannot represent becomes `unsupported` with its media type, so a consumer still sees that something arrived.
+A message is discarded unless it carries an id, a chat address, and content a person authored. `messageContextInfo` and `senderKeyDistributionMessage` describe the delivery rather than the content, and `protocolMessage` is housekeeping such as a revocation or a history-sync notification; an envelope holding only those is dropped, and when they accompany real content they are skipped so the reported type names the payload rather than whichever field decoded first. Media the seam cannot represent becomes `unsupported` with its media type, so a consumer still sees that something arrived.
 
 ## Config
 

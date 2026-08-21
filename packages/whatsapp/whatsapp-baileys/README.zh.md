@@ -32,7 +32,7 @@ auth state 是可变的多文件目录（`authDir`），而非凭据引用。它
 
 Baileys 不提供 message store，因此 `listChats` 与 `fetchMessages` 只回答**本连接自加载以来观察到的内容**：刚重启后二者都为空，并随消息到达而增长。`listChats` 按最新观察到的消息排序；`fetchMessages` 返回最新在前，并用 `before` 翻页。本连接从未观察过的对话失败于 `WHATSAPP_UNKNOWN_CHAT`，而不是返回空页，因为空页与未知地址是两个不同的答案。每个对话的保留量以 `historyPerChat` 为上限，最旧者先被逐出。
 
-没有 id、没有对话地址或没有内容的消息属于协议帧而非会话消息，会被丢弃。seam 无法表示的媒体变为带媒体类型的 `unsupported`，使消费者仍能看到确有内容到达。
+除非消息带有 id、对话地址以及由人撰写的内容，否则一律丢弃。`messageContextInfo` 与 `senderKeyDistributionMessage` 描述的是投递而非内容，`protocolMessage` 属于撤回、历史同步通知一类的事务性帧；仅含这些字段的信封会被丢弃，而当它们伴随真实内容出现时会被跳过，使上报的类型指向载荷本身，而不是恰好最先解码的那个字段。seam 无法表示的媒体变为带媒体类型的 `unsupported`，使消费者仍能看到确有内容到达。
 
 ## Config
 

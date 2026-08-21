@@ -16,7 +16,7 @@ WhatsApp provider 需要 Baileys —— 唯一仍在维护、可连接个人 Wha
 
 库缺失是一个正常且具名的结果：`WhatsAppError`，code 为 `WHATSAPP_BAILEYS_MISSING`，并附安装指引。provider 将自身标记为终止且不再重连，因为没有任何重试能安装一个包。此时 `ctx.whatsapp` 上报 `offline`，每个操作都失败于 `WHATSAPP_PROVIDER_UNAVAILABLE`。
 
-由于该库不在仓库中，测试改为针对 `WhatsAppSocket` 端口而非 Baileys 固定 provider：状态机、重连预算、消息规范化与对话索引均由 socket 替身覆盖。绑定本身 —— 事件名、选项名、socket 方法名 —— 未针对真实库验证，包 README 对此直言不讳，而不是暗示其拥有并不具备的覆盖。
+由于该库不在仓库中，测试改为针对 `WhatsAppSocket` 端口而非 Baileys 固定 provider：状态机、重连预算、消息规范化与对话索引均由 socket 替身覆盖。绑定后来在真实账号上跑通，确认了连接、配对与入站投递；发送、`markRead` 与历史翻页仍未针对该服务验证，包 README 对此直言不讳，而不是暗示其拥有并不具备的覆盖。
 
 ## 曾考虑的替代方案
 

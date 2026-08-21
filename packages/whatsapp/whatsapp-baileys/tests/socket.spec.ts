@@ -220,12 +220,38 @@ describe('message normalization', () => {
     const { socket, events } = await open()
     socket.emitMessages([
       inbound({ key: { id: 'M3', remoteJid: chatId }, message: { imageMessage: {} } as Exclude<BaileysMessage['message'], undefined> }),
-      inbound({ key: { id: 'M4', remoteJid: chatId }, message: {} }),
     ])
     expect(events.map(event => event.kind === 'message' ? event.message.content : undefined)).toEqual([
       { kind: 'unsupported', mediaType: 'imageMessage' },
-      { kind: 'unsupported', mediaType: 'empty' },
     ])
+  })
+
+  it('names the payload, not the delivery metadata decoded before it', async () => {
+    const { socket, events } = await open()
+    socket.emitMessages([
+      inbound({
+        key: { id: 'M7', remoteJid: groupId, participant: '5511777770000@s.whatsapp.net' },
+        message: { senderKeyDistributionMessage: {}, imageMessage: {} } as Exclude<BaileysMessage['message'], undefined>,
+      }),
+      inbound({
+        key: { id: 'M8', remoteJid: chatId },
+        message: { messageContextInfo: {}, conversation: 'oi' } as Exclude<BaileysMessage['message'], undefined>,
+      }),
+    ])
+    expect(events.map(event => event.kind === 'message' ? event.message.content : undefined)).toEqual([
+      { kind: 'unsupported', mediaType: 'imageMessage' },
+      { kind: 'text', text: 'oi' },
+    ])
+  })
+
+  it('drops an envelope that holds only metadata or protocol housekeeping', async () => {
+    const { socket, events } = await open()
+    socket.emitMessages([
+      inbound({ key: { id: 'M9', remoteJid: chatId }, message: {} }),
+      inbound({ key: { id: 'M10', remoteJid: chatId }, message: { protocolMessage: {} } as Exclude<BaileysMessage['message'], undefined> }),
+      inbound({ key: { id: 'M11', remoteJid: chatId }, message: { messageContextInfo: {} } as Exclude<BaileysMessage['message'], undefined> }),
+    ])
+    expect(events).toEqual([])
   })
 
   it('skips entries that carry no address or no body', async () => {

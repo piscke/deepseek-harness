@@ -18,6 +18,8 @@ A WhatsApp account is not a per-request credential: it is a long-lived authentic
 
 Chat kind is the routing discriminator, so a provider that cannot classify a conversation must fail rather than guess.
 
+`whatsapp/message-received` means a person sent something. A frame nobody authored — delivery metadata, or protocol housekeeping such as a revocation or a history-sync notification — is not a message, and a provider drops it rather than publishing it under a media type, so no consumer needs to know a WhatsApp field name to avoid answering plumbing.
+
 ## History is the provider's own observation
 
 The seam owns no message database. `listChats` and `fetchMessages` return what the registered provider retained, and the shipped Baileys provider retains only what its connection observed since it loaded — both are empty right after a restart. A consumer that needs durable conversation history logs what reaches the model, which the [model-visible ⟺ logged rule](../architecture.md) already requires.

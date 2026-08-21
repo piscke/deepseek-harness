@@ -18,6 +18,8 @@ WhatsApp 账号不是按请求使用的凭据：它是一条长期存在的已�
 
 对话类型是路由的判别式，因此无法归类某个对话的 provider 必须失败，而不是猜测。
 
+`whatsapp/message-received` 意味着有人发送了内容。无人撰写的帧 —— 投递元数据，或撤回、历史同步通知一类的协议事务 —— 不是消息，provider 会将其丢弃，而不是以某个媒体类型将其发布，因此没有任何消费者需要知道某个 WhatsApp 字段名才能避开管道层的东西。
+
 ## 历史来自 provider 自己的观察
 
 seam 不拥有任何消息数据库。`listChats` 与 `fetchMessages` 返回已注册 provider 所保留的内容，而随附的 Baileys provider 只保留其连接自加载以来观察到的内容 —— 刚重启后二者都为空。需要持久对话历史的消费者应记录抵达模型的内容，这正是 [model-visible ⟺ logged 规则](../architecture.md)已经要求的。

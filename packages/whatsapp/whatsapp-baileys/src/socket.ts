@@ -267,9 +267,10 @@ function quotedOptions(
  * Normalize one raw message, or skip it.
  *
  * A message without an id or a conversation address cannot be addressed,
- * quoted, or deduplicated, and a protocol message (no `message` body) carries
- * nothing a consumer can read — both are dropped rather than published as an
- * entry no consumer can act on.
+ * quoted, or deduplicated; a message with no `message` body, and one whose
+ * body holds only delivery metadata or protocol housekeeping, carries nothing
+ * a person sent. All are dropped rather than published as an entry no consumer
+ * can act on.
  * @param raw - one entry of a `messages.upsert` batch.
  * @returns the normalized message, or `undefined` when it is not addressable.
  */
@@ -278,6 +279,8 @@ function normalizeMessage(raw: BaileysMessage): WhatsAppMessage | undefined {
   if (id === null || id === undefined || remoteJid === null || remoteJid === undefined) return undefined
   const body = raw.message
   if (body === null || body === undefined) return undefined
+  const content = contentOf(body)
+  if (content === undefined) return undefined
   const chatKind: WhatsAppChatKind = remoteJid.endsWith(GROUP_JID_SUFFIX) ? 'group' : 'direct'
   const pushName = raw.pushName ?? undefined
   // `pushName` is the author's own display name, so it names the conversation
@@ -293,16 +296,36 @@ function normalizeMessage(raw: BaileysMessage): WhatsAppMessage | undefined {
     ...pushName === undefined ? {} : { senderName: pushName },
     fromMe: raw.key.fromMe === true,
     timestamp: timestampOf(raw.messageTimestamp),
-    content: contentOf(body),
+    content,
   }
 }
 
-/** Classify the message body, naming media this provider cannot represent. */
-function contentOf(body: NonNullable<BaileysMessage['message']>): WhatsAppContent {
+/**
+ * Envelope fields that never state what a person sent. `messageContextInfo` and
+ * `senderKeyDistributionMessage` ride alongside real content — the latter on
+ * most group messages — and can decode before the payload they accompany, so
+ * classifying by the first key would report them as the message's type.
+ * `protocolMessage` is housekeeping in its own right: history-sync
+ * notifications, revocations, and ephemeral-setting changes.
+ */
+const NON_CONTENT_FIELDS: ReadonlySet<string> = new Set([
+  'messageContextInfo',
+  'senderKeyDistributionMessage',
+  'protocolMessage',
+])
+
+/**
+ * Classify the message body, naming media this provider cannot represent.
+ * @param body - the raw envelope, which may carry metadata beside its content.
+ * @returns the content, or `undefined` when the envelope holds nothing a person
+ * authored and so is not a message any consumer can answer.
+ */
+function contentOf(body: NonNullable<BaileysMessage['message']>): WhatsAppContent | undefined {
   const text = body.conversation ?? body.extendedTextMessage?.text
   if (text !== null && text !== undefined) return { kind: 'text', text }
-  const [mediaType] = Object.keys(body)
-  return { kind: 'unsupported', mediaType: mediaType ?? 'empty' }
+  const [mediaType] = Object.keys(body).filter(field => !NON_CONTENT_FIELDS.has(field))
+  if (mediaType === undefined) return undefined
+  return { kind: 'unsupported', mediaType }
 }
 
 /**

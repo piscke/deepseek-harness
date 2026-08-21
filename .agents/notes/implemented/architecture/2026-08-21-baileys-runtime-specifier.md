@@ -16,7 +16,7 @@ Beyond licensing, an unofficial reverse-engineered client is a liability every w
 
 A missing library is a normal, named outcome: `WhatsAppError` with code `WHATSAPP_BAILEYS_MISSING` and an install instruction. The provider marks itself terminal and does not reconnect, because no retry can install a package. `ctx.whatsapp` then reports `offline` and every operation fails with `WHATSAPP_PROVIDER_UNAVAILABLE`.
 
-Because the library is absent from the repository, tests pin the provider against the `WhatsAppSocket` port rather than against Baileys: the status machine, reconnection budget, message normalization, and conversation index are covered by a socket double. The binding itself — event names, option names, socket method names — is unverified against the real library, and the package README says so rather than implying coverage it does not have.
+Because the library is absent from the repository, tests pin the provider against the `WhatsAppSocket` port rather than against Baileys: the status machine, reconnection budget, message normalization, and conversation index are covered by a socket double. The binding was later exercised against a real account, which confirmed connection, pairing, and inbound delivery; sending, `markRead`, and history paging remain unverified against the service, and the package README says so rather than implying coverage it does not have.
 
 ## Alternatives considered
 
