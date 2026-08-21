@@ -1,0 +1,72 @@
+[
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "whatsapp-list", "name": "whatsapp_list_chats", "argumentsDelta": "{\"unread_only\":true}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "whatsapp-list", "name": "whatsapp_list_chats", "arguments": "{\"unread_only\":true}" } },
+      { "type": "usage", "usage": { "inputTokens": 10, "outputTokens": 5 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "whatsapp-read", "name": "whatsapp_read_chat", "argumentsDelta": "{\"chat_id\":\"5511999990000@s.whatsapp.net\",\"limit\":2}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "whatsapp-read", "name": "whatsapp_read_chat", "arguments": "{\"chat_id\":\"5511999990000@s.whatsapp.net\",\"limit\":2}" } },
+      { "type": "usage", "usage": { "inputTokens": 10, "outputTokens": 5 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "whatsapp-send-invalid", "name": "whatsapp_send_message", "argumentsDelta": "{\"chat_id\":\"Ana\",\"text\":\"chego as 18h\"}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "whatsapp-send-invalid", "name": "whatsapp_send_message", "arguments": "{\"chat_id\":\"Ana\",\"text\":\"chego as 18h\"}" } },
+      { "type": "usage", "usage": { "inputTokens": 10, "outputTokens": 5 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "whatsapp-send-group", "name": "whatsapp_send_message", "argumentsDelta": "{\"chat_id\":\"12036300000@g.us\",\"text\":\"vou buscar o bolo\"}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "whatsapp-send-group", "name": "whatsapp_send_message", "arguments": "{\"chat_id\":\"12036300000@g.us\",\"text\":\"vou buscar o bolo\"}" } },
+      { "type": "usage", "usage": { "inputTokens": 10, "outputTokens": 5 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "whatsapp-send-ana", "name": "whatsapp_send_message", "argumentsDelta": "{\"chat_id\":\"5511999990000@s.whatsapp.net\",\"text\":\"boa tarde, chego as 18h\"}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "whatsapp-send-ana", "name": "whatsapp_send_message", "arguments": "{\"chat_id\":\"5511999990000@s.whatsapp.net\",\"text\":\"boa tarde, chego as 18h\"}" } },
+      { "type": "usage", "usage": { "inputTokens": 10, "outputTokens": 5 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "tool-call" },
+      { "type": "tool-call-delta", "index": 0, "id": "whatsapp-mark", "name": "whatsapp_mark_read", "argumentsDelta": "{\"chat_id\":\"5511999990000@s.whatsapp.net\"}" },
+      { "type": "block-end", "index": 0, "block": { "type": "tool-call", "id": "whatsapp-mark", "name": "whatsapp_mark_read", "arguments": "{\"chat_id\":\"5511999990000@s.whatsapp.net\"}" } },
+      { "type": "usage", "usage": { "inputTokens": 10, "outputTokens": 5 } },
+      { "type": "finish", "reason": { "kind": "tool-calls" } }
+    ]
+  },
+  {
+    "kind": "chunks",
+    "chunks": [
+      { "type": "block-start", "index": 0, "blockType": "text" },
+      { "type": "text-delta", "index": 0, "text": "WHATSAPP_TOOLS_DONE" },
+      { "type": "block-end", "index": 0, "block": { "type": "text", "text": "WHATSAPP_TOOLS_DONE" } },
+      { "type": "usage", "usage": { "inputTokens": 10, "outputTokens": 2 } },
+      { "type": "finish", "reason": { "kind": "stop" } }
+    ]
+  }
+]

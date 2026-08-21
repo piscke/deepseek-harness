@@ -63,6 +63,8 @@ import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
+import WhatsAppRuntime from '@deepseek-ai/dsh-whatsapp'
+import * as ToolWhatsApp from '@deepseek-ai/dsh-tool-whatsapp'
 import VmWorkflowEngine from '@deepseek-ai/dsh-workflow-worker-thread'
 import * as ToolRalph from '@deepseek-ai/dsh-tool-ralph'
 import * as ToolWorkflow from '@deepseek-ai/dsh-tool-workflow'
@@ -605,6 +607,21 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-whatsapp',
+    dir: 'tool-whatsapp',
+    source: 'packages/whatsapp/tool-whatsapp/src/index.ts',
+    requires: ['ctx.tools', 'ctx.whatsapp', 'ctx.approval (send only)'],
+    writes: ['tool/call', 'whatsapp/outbound', 'tool/result'],
+    async mount(ctx) {
+      // The seam alone decides the schemas; no provider is registered, because
+      // schemas do not depend on account identity or availability.
+      await ctx.plugin(WhatsAppRuntime)
+      await ctx.plugin(ToolWhatsApp)
+    },
+    note:
+      'whatsapp_send_message always requires chat_id and always asks ctx.approval before anything leaves the machine; the other three tools read the account without approval.',
   },
 ]
 

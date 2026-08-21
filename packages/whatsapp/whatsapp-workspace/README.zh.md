@@ -1,0 +1,132 @@
+# @deepseek-ai/dsh-whatsapp-workspace
+
+[English](README.md) | 中文
+
+WhatsApp 工作区：一个注册为 [Workspace](../../workspace/workspace/README.md) 的专用目录、住在其中的会话，以及把账号的入站消息流作为排队的后续轮次投递进这些会话。
+
+这是 [WhatsApp 能力 seam](../whatsapp/README.md)（`ctx.whatsapp`）的消费方。它不注册 provider，也不注册工具——回复一段对话是 [`dsh-tool-whatsapp`](../tool-whatsapp/README.md) 的事。
+
+## 加载时做什么
+
+1. 解析 `directory`（开头的 `~` 展开为用户主目录）并创建它。
+2. 通过 `ctx.workspaceRegistry.create(path, workspaceTitle)` 注册它，于是 Web UI 侧栏里会在仓库工作区旁边出现一个 WhatsApp 工作区。
+3. 订阅 `whatsapp/message-received`。
+4. 打开该路由的常驻会话，每个会话的 `cwd` 都等于那个目录，用 `attachSession` 挂载它们，并固定它们的标题。
+
+订阅安装在常驻会话打开之前，因此启动过程中观察到的消息会排队，而不会丢失。
+
+任何一步无法完成都会让插件加载失败：不可用的目录、拒绝该路径的注册表、打不开的常驻会话。一个悄无声息永远不出现的工作区，与一个断线的账号无法区分。
+
+## 路由
+
+`route` 决定对话如何映射到会话，并且它是必填的——没有哪一种形态适合所有部署。
+
+| 模式 | 会话 | 适用 |
+|---|---|---|
+| `category` | 两个常驻会话，`groupsTitle` 与 `contactsTitle` | 每类对话一个 agent。对于把群聊与个人分开分诊的助手，这是默认形态。 |
+| `per-chat` | 每段对话一个会话，在该对话首次被路由时打开 | 长期、彼此独立的线程。不打开任何常驻会话，因此工作区起初是空的。 |
+| `single` | 一个常驻会话，`conversationsTitle` | 最小的组合：一切都在一处。 |
+
+`allowChatIds` 非空时即是穷尽列表；`denyChatIds` 随后生效，因此同时出现在两者中的会话仍被拒绝。
+
+有两条过滤是部署无法关闭的策略。账号自己写的消息（`fromMe`，包括来自另一台设备的）永不路由，因为把部署自己的回答再送回去会用它自己的话唤醒 agent。已经投递过的消息 id 会被丢弃，因为 provider 在重连后会重放历史。
+
+不存在按内容进行的过滤。`whatsapp/message-received` 意味着某个人发出了什么——provider 会丢弃投递元数据与协议杂务，而不是把它们发布出来——因此本包从不检视 WhatsApp 的字段名，一个它无法渲染的媒体类型同样会成为一个回合。
+
+### 每条消息都标明自己的对话
+
+在 `category` 与 `single` 下，一个会话服务多段对话，因此对话身份是每条消息的一部分，而不是指望模型记住的上下文：
+
+```text
+WhatsApp message in direct chat "Ana" [chat_id: 5511999990000@s.whatsapp.net]
+From: Ana (5511999990000@s.whatsapp.net)
+Sent: 2026-08-21T10:00:00.000Z
+
+boa tarde, você pode confirmar o horário?
+```
+
+那个 `[chat_id: …]` 头部正是 `whatsapp_send_message` 所需要的值，因此回复给对的人是复制，而不是推断。
+
+## 排队投递，永不打断
+
+在 agent 处于轮次中途时到达的消息会等到该轮次结束。投递通过 `runMaintenance` 认领 agent 的空闲阶段，因此框架文本在两轮之间进入日志与 agent 的收件箱；因轮次正占用 agent 而被拒绝的认领会驻留在 `whenIdle()` 上并在下一个边界重试，同时把该批次放回队首，使到达顺序得以保留。
+
+投递按会话串行且会合并：认领成功那一刻队列中的全部内容都在这次认领内投递，于是一阵消息突发只唤醒一次，而不是每条唤醒一次。每条消息仍然是它自己的后续轮次。
+
+单条消息的失败被隔离。日志拒绝的消息会被警告并丢弃，其后的队列继续前进——一条无法记录的消息不能让一整段对话沉默。
+
+## 会话
+
+会话标识是确定性的（`whatsapp-groups`、`whatsapp-contacts`、`whatsapp-conversations`，以及 `per-chat` 的 `whatsapp-chat-<digest>`），因此重启会恢复同一段对话，而不是开一段空的。记录在另一个项目目录下的已存会话会带着两个路径大声失败：这意味着部署在旧目录仍有日志时移动了 `directory`。
+
+标题用 `ctx.sessionTitle.rename()` 固定，其 `user` 来源会永久停止自动标题生成。标题未变时会跳过重新固定，因此重启不会追加一条冗余事件。
+
+## 配置
+
+| 键 | 默认值 | 含义 |
+|---|---|---|
+| `directory` | `~/.dsh/whatsapp` | 工作区拥有、且每个对话会话都在其中运行的目录。必须解析为绝对路径。 |
+| `workspaceTitle` | `WhatsApp` | 工作区在侧栏中的标题。 |
+| `route` | *（必填）* | `category`、`per-chat` 或 `single`。 |
+| `groupsTitle` | `Groups` | `category` 路由的群聊会话标题。 |
+| `contactsTitle` | `Contacts` | `category` 路由的私聊会话标题。 |
+| `conversationsTitle` | `Conversations` | `single` 路由那一个会话的标题。 |
+| `allowChatIds` | `[]` | 非空时，只有其中的对话会被路由。 |
+| `denyChatIds` | `[]` | 永不路由的对话。 |
+| `seenMessageLimit` | `1000` | 记住多少条已投递消息 id，用以压制 provider 的历史重放。 |
+
+标题是配置而非常量，因为它们由人以自己的语言阅读：
+
+```yaml
+- id: whatsapp-workspace
+  name: '@deepseek-ai/dsh-whatsapp-workspace'
+  config:
+    route: category
+    groupsTitle: Grupos
+    contactsTitle: Contatos
+```
+
+`create` 会复用已经拥有该规范路径的记录并保留其标题，因此操作者在 UI 中改过的标题能挺过重启。
+
+## 事件
+
+| 事件 | 追加时机 |
+|---|---|
+| `whatsapp/inbound` | 一条入站消息即将进入会话时，在后续轮次入队之前。 |
+
+先追加使得「模型可见 ⟺ 已记录」在失败方向上成立：日志无法记录的消息永远不会到达模型。出站的一半（`whatsapp/outbound`）属于 [`dsh-tool-whatsapp`](../tool-whatsapp/README.md)。`./invariant` 校验每一条已存的 `whatsapp/inbound` 记录。
+
+## 模型体验
+
+### 入站消息框架
+
+#### 模型看到什么
+
+每条被路由的消息作为它自己的后续轮次到达，携带一条由插件产生的用户消息：一行标明对话种类的头部、账号解析出显示名时的对话名，以及 `[chat_id: <id>]`；一行 `From:`；一行 `Sent:`；一个空行；然后是正文。seam 无法表示的媒体渲染为 `[unsupported media: <type>]`，而不是凭空消失。
+
+##### 一条已投递的消息
+
+```markdown
+WhatsApp message in group chat "Família" [chat_id: 12036300000@g.us]
+From: Ana (5511999990000@s.whatsapp.net)
+Sent: 2026-08-21T10:00:00.000Z
+
+alguém pode buscar o bolo?
+```
+
+#### Token 影响
+
+每条已投递消息一段框架文本，大约四行短行加正文，在会话中保留到压缩为止。一阵突发会在一个轮次边界内投递为若干条消息，而不是每条一轮。
+
+#### KV Cache 影响
+
+仅追加；每段框架文本都跟在可复用的请求前缀之后，不会使既有的 KV cache 条目失效。本包不贡献系统提示词，也不贡献工具 schema，因此前缀本身永不改变。
+
+## 已知限制与推迟的工作
+
+- **这里没有任何东西在真实 WhatsApp 账号上验证过** —— 路由、排队与会话生命周期由针对脚本化 seam 的单元测试与组合测试覆盖。在真实 provider 下的行为尚未验证。
+- **路由信任 seam 的规则：入站事件即人发出的消息** —— 本包不做任何自己的内容判断，因此若某个 provider 发布了投递元数据或协议杂务，就会为它花掉一个回合。那是该 provider 需要修复的缺陷，而在这里复制一份判断，只会在两份清单发生漂移的那一刻悄悄丢掉真实媒体。
+- **去重在内存中** —— `seenMessageLimit` 个 id 与插件同生共死，因此重启后 provider 重放的消息可能被再次投递。持久的 `whatsapp/inbound` 日志知道得更准；在加载时查询它被推迟。
+- **agent 的回复不会被发到任何地方** —— 本包把消息投递进会话。agent 是否回答、回答给谁，是模型通过 `whatsapp_send_message` 做的决定，而那个工具每次都会询问操作者。按设计，这里没有自动回复路径。
+- **`per-chat` 无上限地打开会话** —— 每段对话一个会话，首次接触时创建，既不淘汰也无上限。对话很多的账号应当使用 `allowChatIds` 或分类路由。
+- **每个工作区一个账号，每个账号一个进程** —— seam 只持有一个已认证账号，因此第二个账号意味着第二个 fiber 及其自己的目录。更严格的规则来自 provider：两个连接共用一个认证目录时会互相顶替已链接设备，较早的那个会以连接冲突死亡。与前一个进程重叠的重启，或指向同一目录的第二个 harness，会让账号下线，而不是共享它。

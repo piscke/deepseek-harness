@@ -43,6 +43,7 @@
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
+| `@deepseek-ai/dsh-tool-whatsapp` | `whatsapp_list_chats`、`whatsapp_mark_read`、`whatsapp_read_chat`、`whatsapp_send_message` | `ctx.tools`、`ctx.whatsapp`、`ctx.approval (send only)` | `tool/call`、`whatsapp/outbound`、`tool/result` | - | whatsapp_send_message 永远要求 chat_id，并且在任何内容离开本机之前永远询问 ctx.approval；另外三个工具读取账号时不需要审批。 |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
 
@@ -2223,3 +2224,111 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 来源：[`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。
+
+<a id="deepseek-aidsh-tool-whatsapp"></a>
+
+## `@deepseek-ai/dsh-tool-whatsapp`
+
+### `whatsapp_list_chats`
+
+列出该账号自连接以来观察到的 WhatsApp 会话，包含各自的 chat_id、显示名称、类型（单聊或群聊）以及未读数量。该索引以连接为界，而不是一份名册：它持有这次连接碰巧看到的内容，可能什么都没有。结果为空只表示尚未观察到任何会话，而不表示该账号没有会话。你已经持有的 chat_id——来自收到的消息或来自操作者——即使不在这里也依然可用。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "unread_only": {
+      "type": "boolean",
+      "description": "Return only conversations with unread messages. Defaults to false."
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Maximum conversations to return (1-100). Defaults to 100."
+    }
+  }
+}
+```
+
+来源：[`packages/whatsapp/tool-whatsapp/src/index.ts`](../packages/whatsapp/tool-whatsapp/src/index.ts)
+
+### `whatsapp_mark_read`
+
+将某一个 WhatsApp 会话标记为已读至其最新消息。对方会看到已读回执，因此只标记你确实已经阅读过的会话。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "chat_id": {
+      "type": "string",
+      "description": "The conversation to mark read, exactly as reported by whatsapp_list_chats or by an incoming message."
+    }
+  },
+  "required": [
+    "chat_id"
+  ]
+}
+```
+
+来源：[`packages/whatsapp/tool-whatsapp/src/index.ts`](../packages/whatsapp/tool-whatsapp/src/index.ts)
+
+### `whatsapp_read_chat`
+
+按从新到旧的顺序读取某一个 WhatsApp 会话的近期消息。用它在回复之前了解一个会话的进展。chat_id 必须来自 whatsapp_list_chats 或某条收到的消息。历史记录以连接为界，因此空结果是一种正常结果：它表示这次连接没有为该会话保留任何内容，而不表示该会话是空的或不可达。读起来为空的会话依然可以发送消息。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "chat_id": {
+      "type": "string",
+      "description": "The conversation to read, exactly as reported by whatsapp_list_chats or by an incoming message."
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Maximum messages to return (1-100). Defaults to 20."
+    },
+    "before": {
+      "type": "string",
+      "description": "Return only messages older than this message_id, to page further back."
+    }
+  },
+  "required": [
+    "chat_id"
+  ]
+}
+```
+
+来源：[`packages/whatsapp/tool-whatsapp/src/index.ts`](../packages/whatsapp/tool-whatsapp/src/index.ts)
+
+### `whatsapp_send_message`
+
+向一个明确指定的会话发送一条 WhatsApp 文本消息。chat_id 是必填项，且必须来自 whatsapp_list_chats 或某条收到消息的 [chat_id: ...] 抬头——该工具绝不推断收件人，也不存在“回复上一个会话”。每次发送在离开本机之前都由用户批准，批准提示会写明收件人。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "chat_id": {
+      "type": "string",
+      "description": "The conversation to send to, exactly as reported by whatsapp_list_chats or an incoming message."
+    },
+    "text": {
+      "type": "string",
+      "description": "The message body, as the recipient will read it (1-4096 characters)."
+    },
+    "quoted_message_id": {
+      "type": "string",
+      "description": "A message_id in the same conversation to quote, when the reply should be threaded."
+    }
+  },
+  "required": [
+    "chat_id",
+    "text"
+  ]
+}
+```
+
+来源：[`packages/whatsapp/tool-whatsapp/src/index.ts`](../packages/whatsapp/tool-whatsapp/src/index.ts)
+
+whatsapp_send_message 始终要求 chat_id，并且在任何内容离开本机之前始终询问 ctx.approval；另外三个工具无需批准即可读取账号。
