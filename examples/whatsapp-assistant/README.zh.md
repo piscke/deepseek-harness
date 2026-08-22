@@ -22,6 +22,12 @@ npm install baileys@^6.7.24
 
 然后在 `DSH_WHATSAPP_BAILEYS` 中指明该安装位置。该值是传给动态 `import()` 的模块说明符，因此请使用 `file:` URL 而非文件系统路径；裸写 `baileys` 仅在该说明符能从 Harness 自身解析时才有效。若解析不到安装，提供方会以 `WHATSAPP_BAILEYS_MISSING` 失败并保持停机：任何重连都不可能装上一个包。
 
+## 从 profile 启动，而不是每次传参
+
+每次都在命令行里指明该库与本覆盖层是一种跑法，[用户 profile](../../packages/boot/app-boot/README.md#profiles) 是另一种。把本覆盖层的条目复制到 `$DSH_HOME/profiles/<name>/cordis.patch.yml`，在那里把 `moduleSpecifier` 设为你自己的安装位置，此后 `dsh --profile <name>` 就能在任意目录组合出同一棵树，且无需先导出任何环境变量。
+
+请把这些条目放在该 profile 内，而不是放在 home 级的 `$DSH_HOME/cordis.patch.yml`——后者会被每个 profile 继承：任何第二个带有该提供方的 profile 都会对同一凭据目录另开一个连接，并像第二个进程那样把账号从第一个手里夺走。
+
 ## 配对账号，每个进程一次
 
 覆盖层把凭据目录固定为 `$DSH_HOME/whatsapp/auth`，把被路由的会话固定为 `$DSH_HOME/whatsapp/chats`。启动进程，打开任一 WhatsApp Session 的会话日志，用 WhatsApp 应用的「链接设备」界面扫描二维码。未被扫描前二维码会不断轮换。
