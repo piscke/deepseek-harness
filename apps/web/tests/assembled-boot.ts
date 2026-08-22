@@ -45,8 +45,15 @@ interface BootComposition {
   composeEntries(layers: readonly unknown[][]): ComposedEntry[]
 }
 
+interface BootLayer {
+  /** Manifest whose dependency set resolves the layer's plugin rows. */
+  manifest: string
+  /** Overlay patch file contributing the rows. */
+  patch: string
+}
+
 const REPO_ROOT = process.cwd()
-const BUNDLE_LAYERS = [
+const BUNDLE_LAYERS: readonly BootLayer[] = [
   {
     manifest: join(REPO_ROOT, 'packages/bundle/base/package.json'),
     patch: join(REPO_ROOT, 'packages/bundle/base/cordis.patch.yml'),
@@ -55,14 +62,23 @@ const BUNDLE_LAYERS = [
     manifest: join(REPO_ROOT, 'packages/bundle/web-app/package.json'),
     patch: join(REPO_ROOT, 'packages/bundle/web-app/cordis.patch.yml'),
   },
-] as const
+]
 const bundleResolvers = BUNDLE_LAYERS.map(layer => createRequire(layer.manifest))
 const webBundleResolver = bundleResolvers[1]
 if (webBundleResolver === undefined) throw new Error('assembled boot: web bundle resolver missing')
 const appBoot = await import(pathToFileURL(webBundleResolver.resolve('@deepseek-ai/dsh-app-boot')).href) as unknown as BootComposition
 
-function resolvePackageManifest(specifier: string): string | undefined {
-  for (const require of bundleResolvers) {
+/**
+ * An opt-in composition an operator applies with `dsh web --patch`. Rows it
+ * inserts resolve from the app manifest that declares them, not from a bundle.
+ */
+export const WHATSAPP_ASSISTANT_LAYER: BootLayer = {
+  manifest: join(REPO_ROOT, 'apps/cli/package.json'),
+  patch: join(REPO_ROOT, 'examples/whatsapp-assistant/cordis.yml'),
+}
+
+function resolvePackageManifest(specifier: string, resolvers: readonly NodeJS.Require[]): string | undefined {
+  for (const require of resolvers) {
     try {
       return require.resolve(`${specifier}/package.json`)
     } catch {
@@ -81,14 +97,20 @@ function resolveClientExport(packagePath: string, pkg: ClientPackageManifest): s
   return resolve(dirname(packagePath), relative)
 }
 
-/** Derive the assembled browser graph from the same bundle patches and package declarations as `dsh web`. */
-function loadAssembledPlugins(): readonly AssembledPlugin[] {
-  const entries = appBoot.composeEntries(BUNDLE_LAYERS.map(layer =>
+/**
+ * Derive the assembled browser graph from the same patches and package
+ * declarations as `dsh web`.
+ * @param layers - the bundle patches, plus any overlay an operator would pass with `--patch`.
+ * @returns the boot rows in activation order.
+ */
+function loadAssembledPlugins(layers: readonly BootLayer[]): readonly AssembledPlugin[] {
+  const resolvers = layers.map(layer => createRequire(layer.manifest))
+  const entries = appBoot.composeEntries(layers.map(layer =>
     appBoot.loadOverlayPatches('assembled boot', layer.patch)))
   const plugins = new Map<string, AssembledPlugin>()
   for (const entry of entries) {
     if (entry.disabled === true || typeof entry.name !== 'string') continue
-    const packagePath = resolvePackageManifest(entry.name)
+    const packagePath = resolvePackageManifest(entry.name, resolvers)
     if (packagePath === undefined) continue
     const pkg = JSON.parse(readFileSync(packagePath, 'utf8')) as ClientPackageManifest
     const declaration = pkg.dsh?.client
@@ -114,12 +136,25 @@ function loadAssembledPlugins(): readonly AssembledPlugin[] {
   })
 }
 
-const PLUGINS = loadAssembledPlugins()
+const PLUGINS = loadAssembledPlugins(BUNDLE_LAYERS)
 
-const bundles = new Map(PLUGINS.map(plugin => [
-  plugin.url,
-  readFileSync(plugin.bundlePath, 'utf8'),
-]))
+const graphs = new Map<string, readonly AssembledPlugin[]>([['', PLUGINS]])
+const bundles = new Map<string, string>()
+
+/**
+ * The boot rows for one composition, read once per layer set.
+ * @param overlays - overlays applied over the shipped bundles.
+ * @returns the rows, with their built bundles loaded into the module map.
+ */
+function graphFor(overlays: readonly BootLayer[]): readonly AssembledPlugin[] {
+  const key = overlays.map(layer => layer.patch).join('|')
+  const cached = graphs.get(key) ?? loadAssembledPlugins([...BUNDLE_LAYERS, ...overlays])
+  graphs.set(key, cached)
+  for (const plugin of cached) {
+    if (!bundles.has(plugin.url)) bundles.set(plugin.url, readFileSync(plugin.bundlePath, 'utf8'))
+  }
+  return cached
+}
 
 interface FixtureWindow extends Window {
   __DSH_BOOT__?: { rev: string; entries: WebBootEntry[] }
@@ -187,20 +222,22 @@ export function installAssembledBootEnv(): void {
  * Mount the assembled application on the fixture transport; the teardown
  * registered by installAssembledBootEnv disposes it.
  * @param search - fixture query string used to select deterministic host behavior.
+ * @param overlays - opt-in compositions applied over the shipped bundles, as `dsh web --patch` would.
  */
-export function mountAssembledApp(search = '?fixture'): void {
+export function mountAssembledApp(search = '?fixture', overlays: readonly BootLayer[] = []): void {
+  const graph = graphFor(overlays)
   history.replaceState(null, '', `/${search}`)
   const root = document.createElement('div')
   root.id = 'root'
   document.body.appendChild(root)
-  win.__DSH_BOOT__ = { rev: 'fx', entries: PLUGINS.map(({ bundlePath: _bundlePath, ...plugin }) => plugin) }
+  win.__DSH_BOOT__ = { rev: 'fx', entries: graph.map(({ bundlePath: _bundlePath, ...plugin }) => plugin) }
   const html = injectBootManifest('<head></head>', win.__DSH_BOOT__)
   const facadeSource = /<head><script>([\s\S]*?)<\/script>/.exec(html)?.[1]
   if (facadeSource === undefined) throw new Error('missing injected ModuleLoader facade')
   ;(0, eval)(facadeSource)
   // Mirror the blocking Host-injected scripts before the Vite entry calls create().
   for (const id of ['@deepseek-ai/dsh-client-modules', '@deepseek-ai/dsh-client-runtime']) {
-    const plugin = PLUGINS.find(candidate => candidate.id === id)
+    const plugin = graph.find(candidate => candidate.id === id)
     if (plugin === undefined) throw new Error(`missing parser-preloaded fixture row ${id}`)
     const code = bundles.get(plugin.url)
     if (code === undefined) throw new Error(`missing built bundle ${plugin.url}`)

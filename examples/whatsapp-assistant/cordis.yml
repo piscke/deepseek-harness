@@ -1,9 +1,14 @@
 # Opt-in WhatsApp assistant over the shipped Web composition: the capability
-# seam, one Baileys connection, the Workspace router, and the model-facing
-# tools. The Web surface already owns the approval prompt and the Workspace
-# sidebar, so this overlay adds no UI of its own.
+# seam, one Baileys connection, the Workspace router, the model-facing tools,
+# and the Settings page that pairs the account. The Web surface already owns the
+# approval prompt and the Workspace sidebar.
 #
 #   dsh web --patch examples/whatsapp-assistant/cordis.yml
+#
+# Pair the account from Settings › WhatsApp in the local browser: the page shows
+# the connection state and, while the account is pairing, the live QR. That page
+# is loopback-only, because whoever scans the code links a device with full
+# access to the account.
 #
 # Baileys is installed by the OPERATOR, outside this workspace, and must not be
 # added to any manifest here: it reaches a GPL-3.0 package resolved from git,
@@ -45,3 +50,9 @@
     # whichever preset each session happens to run.
     - id: tool-whatsapp
       name: '@deepseek-ai/dsh-tool-whatsapp'
+
+    # Both halves of the pairing surface: the Host half answers the loopback
+    # `/whatsapp` channel, and the browser half it declares is discovered by the
+    # client module registry from this row.
+    - id: ui-settings-whatsapp
+      name: '@deepseek-ai/dsh-client-ui-settings-whatsapp'

@@ -12,7 +12,7 @@ Two constraints make that composition unusual. `baileys` cannot be a dependency 
 
 ## Decision
 
-[`examples/whatsapp-assistant`](../../../../examples/whatsapp-assistant/README.md) is a patch overlay over the shipped `web` profile, following `examples/web-schedule`. It inserts four rows — the seam, the Baileys provider, the Workspace router on its `category` route, and the tool suite — and adds no UI: approval, the Workspace sidebar, and the Session view are surfaces the Web profile already ships. The default Web tree is unchanged.
+[`examples/whatsapp-assistant`](../../../../examples/whatsapp-assistant/README.md) is a patch overlay over the shipped `web` profile, following `examples/web-schedule`. It inserts five rows — the seam, the Baileys provider, the Workspace router on its `category` route, the tool suite, and the [pairing page](2026-08-24-whatsapp-pairing-in-settings.md) added after this note shipped — and adds no other UI: approval, the Workspace sidebar, and the Session view are surfaces the Web profile already ships. The default Web tree is unchanged.
 
 The overlay makes two decisions the provider's own defaults leave open.
 
