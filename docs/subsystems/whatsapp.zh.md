@@ -12,6 +12,12 @@ WhatsApp 账号不是按请求使用的凭据：它是一条长期存在的已�
 
 `WhatsAppStatus` 是封闭联合：`offline`、`connecting`、`pairing`（携带人工扫描的二维码负载，provider 每次轮换都会重新发出）、`online`（携带账号 id）与 `logged-out`（对当前凭据是终止性的 —— 账号必须重新配对，任何重连都无法恢复）。除 `status()` 与 `register()` 外的每个操作都要求 `online`：未注册 provider 时失败于 `WHATSAPP_PROVIDER_UNAVAILABLE`，其余状态失败于 `WHATSAPP_NOT_ONLINE`。
 
+## 人在哪里扫码
+
+配对是本能力唯一需要人参与的时刻，因此它在产品里有自己的位置，而不是一个调试界面：[dsh-client-ui-settings-whatsapp](../../packages/client/ui-settings-whatsapp) 为 Web 设置贡献一个 **WhatsApp** 页面，展示当前状态，并在账号处于配对中时展示实时二维码。
+
+该页面只对本机（loopback）开放。`pairing` 负载是一份凭据——扫描它就会把一台设备链接到该账号并取得完全访问权——因此本包自己注册了一条 `authority: 'loopback'` 的 Connection RPC 通道，而没有搭载共享平面：转发的 host 事件会到达每一个已连接的浏览器，而 Typert `/api` 平面只为受信任主机注册一次。页面在打开期间轮询该通道，这就是这道围栏的代价，也是二维码不会被推送到任何地方的原因。
+
 ## 消息是什么
 
 `WhatsAppMessage` 携带 branded 的 `WhatsAppMessageId`、所属 `WhatsAppChatId`、对话是 `direct` 还是 `group`、作者、是否由已连接账号所写（`fromMe`，包括来自其他设备）、RFC 3339 UTC 时间戳，以及 `WhatsAppContent` 正文。内容是 `text` 与 `unsupported` 的封闭联合 —— provider 会把无法表示的媒体连同其媒体类型一并报告，而不是丢弃消息，使消费者仍能看到确有内容到达并据此回复。

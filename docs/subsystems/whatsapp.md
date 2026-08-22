@@ -12,6 +12,12 @@ A WhatsApp account is not a per-request credential: it is a long-lived authentic
 
 `WhatsAppStatus` is a closed union of `offline`, `connecting`, `pairing` (carrying the QR payload a human scans, re-emitted whenever the provider rotates it), `online` (carrying the account id), and `logged-out` (terminal for the current credentials — the account must pair again, and no reconnection can recover it). Every operation except `status()` and `register()` requires `online`: no provider registered fails with `WHATSAPP_PROVIDER_UNAVAILABLE`, any other state with `WHATSAPP_NOT_ONLINE`.
 
+## Where a human scans the code
+
+Pairing is the one moment this capability needs a person, so it has a place in the product rather than a debugging surface: [dsh-client-ui-settings-whatsapp](../../packages/client/ui-settings-whatsapp) contributes a **WhatsApp** page to Web Settings that renders the current status and, while the account is pairing, the live code.
+
+The page is loopback-only. A `pairing` payload is a credential — scanning it links a device with full access to the account — so the package registers its own Connection RPC channel with `authority: 'loopback'` instead of riding a shared plane: forwarded host events reach every connected browser, and the Typert `/api` plane is registered once for trusted hosts. The page polls that channel while it is open, which is what the fence costs and why nothing pushes the code anywhere.
+
 ## What a message is
 
 `WhatsAppMessage` carries a branded `WhatsAppMessageId`, its `WhatsAppChatId`, whether the conversation is `direct` or `group`, the author, whether the connected account wrote it (`fromMe`, including from another device), an RFC 3339 UTC timestamp, and a `WhatsAppContent` body. Content is a closed union of `text` and `unsupported` — a provider reports media it cannot represent with its media type rather than dropping the message, so a consumer still sees that something arrived and can answer accordingly.

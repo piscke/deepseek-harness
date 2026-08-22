@@ -9,7 +9,7 @@ DSH_WHATSAPP_BAILEYS=file:///abs/path/to/wa-deps/node_modules/baileys/lib/index.
   dsh web --patch examples/whatsapp-assistant/cordis.yml
 ```
 
-It composes the capability seam, the Baileys provider, the Workspace router on its `category` route, and the four model-facing tools. Approval, the Workspace sidebar, and the Session view are the shipped Web surfaces; this overlay adds no UI.
+It composes the capability seam, the Baileys provider, the Workspace router on its `category` route, the four model-facing tools, and the Settings page that pairs the account. Approval, the Workspace sidebar, and the Session view are the shipped Web surfaces.
 
 ## Install Baileys yourself
 
@@ -24,7 +24,9 @@ Then name that install in `DSH_WHATSAPP_BAILEYS`. The value is a module specifie
 
 ## Pair the account, once per process
 
-The overlay pins the credential directory to `$DSH_HOME/whatsapp/auth` and the routed conversations to `$DSH_HOME/whatsapp/chats`. Start the process, open the Session log of any WhatsApp Session, and scan the QR from the linked-device screen of the WhatsApp app. The QR rotates until it is scanned.
+The overlay pins the credential directory to `$DSH_HOME/whatsapp/auth` and the routed conversations to `$DSH_HOME/whatsapp/chats`. Start the process, open **Settings › WhatsApp** in the browser on that machine, and scan the QR it shows from the linked-device screen of the WhatsApp app. The page follows the connection state and replaces the code as it rotates, until it is scanned.
+
+That page answers the loopback browser only, and deliberately: whoever scans the code links a device with full access to the account, so the code is a credential and stays on the machine running the harness. A browser reaching `dsh web` from elsewhere on the network finds the page unable to read the status at all.
 
 WhatsApp allows one connection per linked device, and a new connection *replaces* the old one. A second process on the same credential directory therefore kills the first with a `conflict` stream error, and both then fight over the account. Because both directories follow `DSH_HOME`, the rule to keep is: **one `dsh web` per `DSH_HOME`.** Run a second account from a second `DSH_HOME`, never from a second process against the same one. A second account is a second linked device, so it needs its own QR scan rather than a copy of the first one's credentials.
 

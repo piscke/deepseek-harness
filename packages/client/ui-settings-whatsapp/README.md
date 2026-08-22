@@ -1,0 +1,25 @@
+# @deepseek-ai/dsh-client-ui-settings-whatsapp
+
+English | [中文](README.zh.md)
+
+The **WhatsApp** page of Web Settings, and the Host channel that feeds it. Both halves live in one package because they share one wire vocabulary: the channel name, the endpoint name, and the decoder that reconstructs the [`whatsapp`](../../whatsapp/whatsapp/README.md) seam's `WhatsAppStatus` union from a JSON payload.
+
+The Host half injects `connection` and `whatsapp` and registers `/whatsapp` with `authority: 'loopback'`; its single `status` endpoint returns `ctx.whatsapp.status()`, and any other endpoint is a `bad-request`. The loopback authority is the point of the package: a `pairing` status carries a credential — whoever scans the code links a device with full access to the account — so it reaches the browser on the machine running the harness and nowhere else. Forwarded Host events would broadcast it to every connected browser, and the Typert `/api` plane is registered once for trusted hosts, so neither can express this fence for one opt-in feature.
+
+The browser half registers one localized `settings.section` contribution with id `whatsapp` at order 25, after Models and Plugins. It reads no status during plugin activation: the mounted page calls `status` and re-reads it every two seconds for as long as it stays open, because Baileys replaces the pairing code on the order of seconds and a stale code cannot be scanned. The page switches on the closed status union — offline, connecting, pairing (the QR, the rotation notice, and the warning that scanning links a device), online (the account id when the provider reported one), logged out (the provider's reason) — and ends in `assertNever`. Loading, failure, and retry stay local to the mounted component. Registration goes through `ctx.slots.inject()`, so it follows late section declaration, redeclaration, locale changes, and teardown without importing the Settings shell.
+
+Composing the package is what creates the page, so its presence is the capability check: a harness without WhatsApp shows no WhatsApp page rather than an empty one. [`examples/whatsapp-assistant`](../../../examples/whatsapp-assistant/README.md) inserts the row.
+
+## Model Experience
+
+None, as this package only renders a Host-owned connection state in browser Settings and registers nothing model-facing.
+
+#### KV Cache effect
+
+None; this package neither assembles nor sends a provider request.
+
+## Known Limitations and Deferred Work
+
+- **Read-only** — the page shows state and pairs an account. Unlinking, forcing a reconnect, and naming the account are a later change on the same surface.
+- **Polling, not push** — the direct consequence of the loopback fence. Pushing the QR to a LAN browser would be a deliberate second decision about who may see a credential, not a transport refinement.
+- **Pairing cannot be rehearsed in CI** — a real code needs an operator-installed Baileys and a phone. The fixture transport serves each status arm, so the page is proven without an account; the scan itself stays a manual step.

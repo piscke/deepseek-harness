@@ -36,6 +36,7 @@ const EXPECTED_ROWS: { id: string; name: string }[] = [
   { id: 'whatsapp-baileys', name: '@deepseek-ai/dsh-whatsapp-baileys' },
   { id: 'whatsapp-workspace', name: '@deepseek-ai/dsh-whatsapp-workspace' },
   { id: 'tool-whatsapp', name: '@deepseek-ai/dsh-tool-whatsapp' },
+  { id: 'ui-settings-whatsapp', name: '@deepseek-ai/dsh-client-ui-settings-whatsapp' },
 ]
 
 function insertedRows(patches: PatchOptions[]): InsertedRow[] {
@@ -47,7 +48,7 @@ describe('whatsapp-assistant example overlay', () => {
   const source = readFileSync(overlay, 'utf8')
   const rows = insertedRows(loadOverlayPatches('whatsapp-assistant-config-test', overlay))
 
-  it('composes the seam, the provider, the router, and the tool suite', () => {
+  it('composes the seam, the provider, the router, the tool suite, and the pairing page', () => {
     expect(rows.map(row => ({ id: row.id, name: row.name }))).toEqual(EXPECTED_ROWS)
   })
 
