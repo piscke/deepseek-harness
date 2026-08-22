@@ -1,0 +1,27 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types",
+    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
+  },
+  "files": [
+    "src/channel.ts",
+    "src/index.ts",
+    "src/invariant.ts"
+  ],
+  "references": [
+    {
+      "path": "../connection/tsconfig.host.json"
+    },
+    {
+      "path": "../../host/apiproxy"
+    },
+    {
+      "path": "../../whatsapp/whatsapp"
+    },
+    {
+      "path": "../../runtime-diagnostics/invariants"
+    }
+  ]
+}

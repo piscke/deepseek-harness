@@ -1,0 +1,4 @@
+state=pairing
+qr=svg(2 path)
+title=Scan to pair
+warning=true

@@ -1450,6 +1450,43 @@ export interface FixtureOptions {
   dropSessionCreateResponse?: boolean
   /** Order of the two successful create frames. */
   createFrameOrder?: 'session-first' | 'workspace-first'
+  /**
+   * Answer the WhatsApp pairing channel with this connection state. Absent
+   * means the channel is unregistered, which is what a harness without the
+   * WhatsApp overlay looks like from the browser.
+   */
+  whatsapp?: FxWhatsAppState
+}
+
+/**
+ * States the fixture's WhatsApp pairing channel can report. Mirrors the closed
+ * `WhatsAppStatus` union owned by `@deepseek-ai/dsh-whatsapp`, which this
+ * generic package must not depend on.
+ */
+export type FxWhatsAppState = 'offline' | 'connecting' | 'pairing' | 'online' | 'logged-out'
+
+/**
+ * Channel and endpoint owned by `@deepseek-ai/dsh-client-ui-settings-whatsapp`,
+ * named here as literals because the dependency only runs the other way.
+ */
+const FX_WHATSAPP_CHANNEL = '/whatsapp'
+const FX_WHATSAPP_STATUS_ENDPOINT = 'status'
+
+/** Stable pairing payload, so a scanned-code surface renders deterministically. */
+export const FIXTURE_WHATSAPP_QR = '2@fixture-pairing-code'
+
+/**
+ * Build the status payload the fixture channel answers with.
+ * @param state - the connection state a scenario selected.
+ * @returns the wire payload for that state.
+ */
+function fixtureWhatsAppStatus(state: FxWhatsAppState): unknown {
+  switch (state) {
+    case 'pairing': return { state, qr: FIXTURE_WHATSAPP_QR }
+    case 'online': return { state, accountId: '55119xxxxxxxx@s.whatsapp.net' }
+    case 'logged-out': return { state, reason: 'the fixture ended this session' }
+    default: return { state }
+  }
 }
 
 /** Inbox pump shared by both stream generators (FrameQueue pattern: ONE abort listener hung
@@ -3091,6 +3128,22 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
 
   const rpc: ClientConnectionRpc = {
     call(channel, endpoint, payload) {
+      if (channel === FX_WHATSAPP_CHANNEL) {
+        if (options.whatsapp === undefined) {
+          return Promise.reject(new Error(`fixture connection RPC channel ${JSON.stringify(channel)} is unavailable`))
+        }
+        if (endpoint !== FX_WHATSAPP_STATUS_ENDPOINT) {
+          return Promise.resolve({
+            ok: false,
+            error: {
+              code: 'bad-request',
+              message: `unknown whatsapp endpoint ${JSON.stringify(endpoint)}`,
+              details: { issues: [] },
+            },
+          })
+        }
+        return Promise.resolve({ ok: true, value: fixtureWhatsAppStatus(options.whatsapp) })
+      }
       if (channel !== '/api') {
         return Promise.reject(new Error(`fixture connection RPC channel ${JSON.stringify(channel)} is unavailable`))
       }
@@ -3276,11 +3329,23 @@ export class FixtureApiClient extends AbstractApiClient {
 function fixtureOptionsFromLocation(): FixtureOptions {
   if (typeof location === 'undefined') return {}
   const query = new URLSearchParams(location.search)
+  const whatsapp = query.get('fixtureWhatsApp')
   return {
     empty: query.get('fixture') === 'empty',
     rejectPrompt: query.get('fixturePrompt') === 'reject',
     failWorkspaceAttach: query.get('fixtureAttach') === 'fail',
     dropSessionCreateResponse: query.get('fixtureSessionCreate') === 'drop-response',
     createFrameOrder: query.get('fixtureFrames') === 'workspace-first' ? 'workspace-first' : 'session-first',
+    ...isFxWhatsAppState(whatsapp) ? { whatsapp } : {},
   }
+}
+
+/**
+ * Whether a query value names a WhatsApp state the fixture can serve.
+ * @param value - the raw `fixtureWhatsApp` query value, if present.
+ * @returns true when the value is one of the reportable states.
+ */
+function isFxWhatsAppState(value: string | null): value is FxWhatsAppState {
+  return value === 'offline' || value === 'connecting' || value === 'pairing'
+    || value === 'online' || value === 'logged-out'
 }

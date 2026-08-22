@@ -12,7 +12,7 @@ WhatsApp 能力接缝、它的 Baileys 提供方、工作区路由器，以及�
 
 ## 决定
 
-[`examples/whatsapp-assistant`](../../../../examples/whatsapp-assistant/README.md) 是覆盖在已发布 `web` profile 之上的 patch overlay，沿用 `examples/web-schedule` 的形态。它插入四行——接缝、Baileys 提供方、按 `category` 路由的工作区路由器，以及工具套件——并且不新增任何 UI：审批、工作区侧边栏与 Session 视图都是 Web profile 已经提供的界面。默认 Web 树保持不变。
+[`examples/whatsapp-assistant`](../../../../examples/whatsapp-assistant/README.md) 是覆盖在已发布 `web` profile 之上的 patch overlay，沿用 `examples/web-schedule` 的形态。它插入五行——接缝、Baileys 提供方、按 `category` 路由的工作区路由器、工具套件，以及本记录发布之后才加入的[配对页面](2026-08-24-whatsapp-pairing-in-settings.md)——除此之外不新增任何 UI：审批、工作区侧边栏与 Session 视图都是 Web profile 已经提供的界面。默认 Web 树保持不变。
 
 覆盖层作出了两项提供方默认值未决定的选择。
 

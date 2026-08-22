@@ -9,7 +9,7 @@ DSH_WHATSAPP_BAILEYS=file:///abs/path/to/wa-deps/node_modules/baileys/lib/index.
   dsh web --patch examples/whatsapp-assistant/cordis.yml
 ```
 
-它组合了能力接缝、Baileys 提供方、按 `category` 路由的工作区路由器，以及四个面向模型的工具。审批、工作区侧边栏与 Session 视图都是 Web 已有的界面；本覆盖层不新增任何 UI。
+它组合了能力接缝、Baileys 提供方、按 `category` 路由的工作区路由器、四个面向模型的工具，以及用于配对账号的设置页面。审批、工作区侧边栏与 Session 视图都是 Web 已有的界面。
 
 ## 自行安装 Baileys
 
@@ -24,7 +24,9 @@ npm install baileys@^6.7.24
 
 ## 配对账号，每个进程一次
 
-覆盖层把凭据目录固定为 `$DSH_HOME/whatsapp/auth`，把被路由的会话固定为 `$DSH_HOME/whatsapp/chats`。启动进程，打开任一 WhatsApp Session 的会话日志，用 WhatsApp 应用的「链接设备」界面扫描二维码。未被扫描前二维码会不断轮换。
+覆盖层把凭据目录固定为 `$DSH_HOME/whatsapp/auth`，把被路由的会话固定为 `$DSH_HOME/whatsapp/chats`。启动进程，在该机器的浏览器中打开**设置 › WhatsApp**，用 WhatsApp 应用的「链接设备」界面扫描页面上的二维码。页面会跟随连接状态，并在二维码轮换时替换它，直到扫描完成。
+
+该页面只回应本机（loopback）浏览器，而且是刻意如此：扫码者会把一台设备链接到该账号并取得完全访问权，因此这个码是凭据，只停留在运行 harness 的机器上。从网络上其他位置访问 `dsh web` 的浏览器，会看到该页面根本读不到状态。
 
 WhatsApp 每个链接设备只允许一个连接，且新连接会*替换*旧连接。因此第二个进程使用同一凭据目录会以 `conflict` 流错误杀死第一个，两者随后争夺该账号。由于两个目录都跟随 `DSH_HOME`，需要记住的规则是：**每个 `DSH_HOME` 只跑一个 `dsh web`。** 第二个账号请用第二个 `DSH_HOME`，绝不要用第二个进程对着同一个。第二个账号就是第二台链接设备，因此它需要自己扫一次码，而不是复制第一个的凭据。
 
