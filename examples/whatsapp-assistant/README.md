@@ -22,6 +22,12 @@ npm install baileys@^6.7.24
 
 Then name that install in `DSH_WHATSAPP_BAILEYS`. The value is a module specifier passed to a dynamic `import()`, so use a `file:` URL rather than a filesystem path; a bare `baileys` works only when the specifier resolves from the harness itself. Without a resolvable install the provider fails as `WHATSAPP_BAILEYS_MISSING` and stays down: no reconnection can install a package.
 
+## Boot it from a profile instead of a flag
+
+Naming the library and the overlay on every command is one way to run this; a [user profile](../../packages/boot/app-boot/README.md#profiles) is the other. Copy this overlay's entries into `$DSH_HOME/profiles/<name>/cordis.patch.yml`, set `moduleSpecifier` there to your own install, and `dsh --profile <name>` composes the same tree from any directory with nothing to export first.
+
+Keep those entries in that profile rather than in the home-level `$DSH_HOME/cordis.patch.yml`, which every profile inherits: any second profile carrying the provider opens its own connection to the same credential directory and takes the account from the first, exactly as a second process does.
+
 ## Pair the account, once per process
 
 The overlay pins the credential directory to `$DSH_HOME/whatsapp/auth` and the routed conversations to `$DSH_HOME/whatsapp/chats`. Start the process, open **Settings › WhatsApp** in the browser on that machine, and scan the QR it shows from the linked-device screen of the WhatsApp app. The page follows the connection state and replaces the code as it rotates, until it is scanned.
