@@ -51,6 +51,7 @@ export class SessionQueueMirror {
       id: item.id,
       messageId: item.message.id,
       placement: item.placement,
+      source: item.message.source,
       content: item.message.content,
       preview: previewOf(item.message.content),
       text: textOf(item.message.content),

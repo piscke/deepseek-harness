@@ -3239,6 +3239,11 @@ export interface Config {
   /** Chat ids never routed. Applied after `allowChatIds`, so a denied id stays denied. */
   denyChatIds?: string[]
   /**
+   * How a delivered message reaches the model: as pending context the
+   * operator's next prompt carries, or as its own follow-up turn.
+   */
+  inboundDelivery?: WhatsAppInboundDelivery
+  /**
    * Agent preset mounted on each conversation session as it is created. Absent
    * composes nothing, which leaves the session with whatever the composition
    * gives every agent.
@@ -3257,9 +3262,21 @@ export interface Config {
  * - `contacts` — direct conversations only.
  */
 export type WhatsAppChatScope = 'all' | 'groups' | 'contacts'
+
+/**
+ * How a delivered message reaches the model. A CLOSED union: consumers `switch`
+ * on it ending in `assertNever`, so a new mode breaks compilation.
+ *
+ * - `context` — the framing is queued as pending model-facing context and waits
+ *   there. The operator's next prompt in that conversation is what carries it
+ *   into a request, so an inbound message costs no turn of its own.
+ * - `turn` — the framing opens its own follow-up turn, so the agent answers
+ *   every message without an operator present.
+ */
+export type WhatsAppInboundDelivery = 'context' | 'turn'
 ```
 
-来源：[`packages/whatsapp/whatsapp-workspace/src/index.ts:72`](../packages/whatsapp/whatsapp-workspace/src/index.ts)
+来源：[`packages/whatsapp/whatsapp-workspace/src/index.ts:77`](../packages/whatsapp/whatsapp-workspace/src/index.ts)
 
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 

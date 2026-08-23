@@ -38,18 +38,28 @@ function message(
 /**
  * An Agent stand-in exposing exactly the phase control the inbox drives:
  * `busy` refuses the maintenance claim the way a turn-driving agent does, and
- * `releaseIdle` publishes the idle boundary the inbox parks on.
+ * `releaseIdle` publishes the idle boundary the inbox parks on. `inject` and
+ * `followup` are recorded apart so a test can tell pending context from a
+ * framing that woke a turn, and together in arrival order.
  */
 class FakeAgent {
   readonly id = SessionId('whatsapp-contacts')
   readonly session = Session.create(SessionId('whatsapp-contacts'))
+  readonly delivered: UserMessage[] = []
   readonly followups: UserMessage[] = []
+  readonly injections: UserMessage[] = []
   busy = false
   maintenanceCalls = 0
   private idle = Promise.withResolvers<undefined>()
 
   followup(message: UserMessage): void {
     this.followups.push(message)
+    this.delivered.push(message)
+  }
+
+  inject(message: UserMessage): void {
+    this.injections.push(message)
+    this.delivered.push(message)
   }
 
   runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T> {
@@ -69,7 +79,7 @@ class FakeAgent {
 
   /** The text of every framing this agent received, in delivery order. */
   texts(): string[] {
-    return this.followups.map(followup => followup.content.map(block => block.type === 'text' ? block.text : '').join(''))
+    return this.delivered.map(entry => entry.content.map(block => block.type === 'text' ? block.text : '').join(''))
   }
 
   /** The `whatsapp/inbound` message ids recorded on this agent's session. */
@@ -116,21 +126,58 @@ describe('inboundEvent', () => {
 })
 
 describe('WhatsAppSessionInbox', () => {
-  it('logs then delivers each queued message as its own follow-up', async () => {
+  it('logs then leaves each queued message pending as context, waking no turn', async () => {
     const { agent, inbox } = harness()
-    inbox.enqueue(message('M1'))
+    inbox.enqueue(message('M1'), 'context')
     await settle()
 
     expect(agent.logged()).toEqual(['M1'])
     expect(agent.texts()[0]).toContain('body M1')
-    expect(agent.followups[0]?.source).toEqual({ kind: 'plugin', plugin: 'whatsapp-workspace' })
+    expect(agent.followups).toEqual([])
+    expect(agent.injections[0]?.source).toEqual({
+      kind: 'plugin',
+      plugin: 'whatsapp-workspace',
+      form: 'notice',
+      summary: 'Ana: body M1',
+    })
+    await inbox.dispose()
+  })
+
+  it('logs then delivers each queued message as its own follow-up under turn delivery', async () => {
+    const { agent, inbox } = harness()
+    inbox.enqueue(message('M1'), 'turn')
+    inbox.enqueue(message('M2'), 'turn')
+    await settle()
+
+    expect(agent.logged()).toEqual(['M1', 'M2'])
+    expect(agent.injections).toEqual([])
+    expect(agent.followups).toHaveLength(2)
+    expect(agent.texts()[0]).toContain('body M1')
+    await inbox.dispose()
+  })
+
+  it('honours the mode captured per message, so a settings change mid-queue applies from there on', async () => {
+    const { agent, inbox } = harness()
+    agent.busy = true
+    inbox.enqueue(message('M1'), 'context')
+    await settle()
+    inbox.enqueue(message('M2'), 'turn')
+    await settle()
+
+    agent.busy = false
+    agent.releaseIdle()
+    await settle()
+
+    expect(agent.injections).toHaveLength(1)
+    expect(agent.followups).toHaveLength(1)
+    expect(agent.texts().map(text => text.includes('body M1'))).toEqual([true, false])
     await inbox.dispose()
   })
 
   it('delivers messages queued during one drain in arrival order', async () => {
     const { agent, inbox } = harness()
-    inbox.enqueue(message('M1'))
-    inbox.enqueue(message('M2'))
+    inbox.enqueue(message('M1'), 'context')
+    inbox.enqueue(message('M2'), 'context')
     await settle()
 
     expect(agent.logged()).toEqual(['M1', 'M2'])
@@ -140,9 +187,9 @@ describe('WhatsAppSessionInbox', () => {
   it('delivers everything waiting at one idle boundary as a single claim', async () => {
     const { agent, inbox } = harness()
     agent.busy = true
-    inbox.enqueue(message('M1'))
+    inbox.enqueue(message('M1'), 'context')
     await settle()
-    inbox.enqueue(message('M2'))
+    inbox.enqueue(message('M2'), 'context')
     await settle()
 
     agent.busy = false
@@ -155,14 +202,14 @@ describe('WhatsAppSessionInbox', () => {
     await inbox.dispose()
   })
 
-  it('waits for the idle boundary rather than interrupting a running turn', async () => {
+  it('waits for the idle boundary rather than joining a running turn', async () => {
     const { agent, inbox } = harness()
     agent.busy = true
-    inbox.enqueue(message('M1'))
+    inbox.enqueue(message('M1'), 'context')
     await settle()
     expect(agent.logged()).toEqual([])
 
-    inbox.enqueue(message('M2'))
+    inbox.enqueue(message('M2'), 'context')
     await settle()
     expect(agent.logged()).toEqual([])
 
@@ -176,9 +223,9 @@ describe('WhatsAppSessionInbox', () => {
   it('parks on one idle boundary at a time', async () => {
     const { agent, inbox } = harness()
     agent.busy = true
-    inbox.enqueue(message('M1'))
+    inbox.enqueue(message('M1'), 'context')
     await settle()
-    inbox.enqueue(message('M2'))
+    inbox.enqueue(message('M2'), 'context')
     await settle()
 
     // Both attempts share the single park: the second claim is refused while
@@ -201,8 +248,8 @@ describe('WhatsAppSessionInbox', () => {
     }) as typeof agent.session.append)
     const { inbox, warnings } = harness(agent)
 
-    inbox.enqueue(message('M1'))
-    inbox.enqueue(message('M2'))
+    inbox.enqueue(message('M1'), 'context')
+    inbox.enqueue(message('M2'), 'context')
     await settle()
 
     expect(agent.logged()).toEqual(['M2'])
@@ -216,7 +263,7 @@ describe('WhatsAppSessionInbox', () => {
     agent.runMaintenance = () => Promise.reject(new Error('agent went away'))
     const { inbox, warnings } = harness(agent)
 
-    inbox.enqueue(message('M1'))
+    inbox.enqueue(message('M1'), 'context')
     await settle()
     expect(warnings[0]).toMatch(/delivery loop failed.*agent went away/)
     await inbox.dispose()
@@ -228,7 +275,7 @@ describe('WhatsAppSessionInbox', () => {
     agent.whenIdle = () => Promise.reject(new Error('agent disposed'))
     const { inbox, warnings } = harness(agent)
 
-    inbox.enqueue(message('M1'))
+    inbox.enqueue(message('M1'), 'context')
     await settle()
     expect(warnings[0]).toMatch(/idle wait failed.*agent disposed/)
     await inbox.dispose()
@@ -237,7 +284,7 @@ describe('WhatsAppSessionInbox', () => {
   it('drops what never left the queue on disposal', async () => {
     const { agent, inbox } = harness()
     agent.busy = true
-    inbox.enqueue(message('M1'))
+    inbox.enqueue(message('M1'), 'context')
     await settle()
 
     await inbox.dispose()
@@ -246,7 +293,7 @@ describe('WhatsAppSessionInbox', () => {
     await settle()
 
     expect(agent.logged()).toEqual([])
-    inbox.enqueue(message('M2'))
+    inbox.enqueue(message('M2'), 'context')
     await settle()
     expect(agent.logged()).toEqual([])
     await inbox.dispose()
@@ -258,7 +305,7 @@ describe('WhatsAppSessionInbox', () => {
     agent.runMaintenance = () => Promise.reject('plain rejection')
     const { inbox, warnings } = harness(agent)
 
-    inbox.enqueue(message('M1'))
+    inbox.enqueue(message('M1'), 'context')
     await settle()
     expect(warnings[0]).toMatch(/plain rejection/)
     await inbox.dispose()

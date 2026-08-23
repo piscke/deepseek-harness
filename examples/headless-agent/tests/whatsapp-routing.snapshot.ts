@@ -1,8 +1,9 @@
 /**
  * Assembled-app snapshot for the WhatsApp Workspace: one inbound message opens
  * one session for the conversation it came from, titled with the name the
- * account resolves, and the turn runs inside that session. The account is
- * scripted, so the transcript is the shipped routing path without a phone.
+ * account resolves, and waits there as pending context until the operator's
+ * prompt carries it into a request. The account is scripted, so the transcript
+ * is the shipped routing path without a phone.
  * @module whatsapp-routing-snapshot
  */
 
@@ -22,6 +23,7 @@ const binScript = fileURLToPath(new URL('./fixtures/whatsapp-inbound-driver.ts',
 const tsconfigPath = fileURLToPath(new URL('../../../tsconfig.json', import.meta.url))
 const refreshing = process.env.DSH_SNAPSHOT === 'refresh'
 const inbound = 'boa tarde, confirmo as 18h'
+const prompt = 'o que a Ana disse?'
 
 interface JsonObject {
   [key: string]: unknown
@@ -43,7 +45,7 @@ async function persistedLog(cwd: string): Promise<string> {
 }
 
 describe('whatsapp per-conversation snapshot', () => {
-  it('opens one named session for the conversation the message came from', async () => {
+  it('holds an inbound message as pending context until the operator prompts', async () => {
     let cwd = ''
     const result = await runLoaderSmoke({
       label: 'whatsapp per-conversation headless stream-json snapshot',
@@ -51,7 +53,7 @@ describe('whatsapp per-conversation snapshot', () => {
       binScript,
       libBinScript: binScript,
       configPath,
-      binArgs: [configPath, inbound],
+      binArgs: [configPath, prompt, inbound],
       tsconfigPath,
       env: {
         DSH_SNAPSHOT_FILE: replayFixture,
@@ -75,6 +77,12 @@ describe('whatsapp per-conversation snapshot', () => {
         // Model-visible ⟺ logged: the inbound message reached the model as an
         // inbox entry of this conversation's own session.
         expect(session).toContain(inbound)
+        // Delivery is passive: exactly one turn ran, opened by the operator's
+        // prompt, and the message rode into it as already-pending context.
+        const claimed = records.filter(record => record.type === 'agent/inbox/spliced')
+        expect(claimed.length).toBeGreaterThan(0)
+        expect(records.filter(record => record.type === 'turn/start')).toHaveLength(1)
+        expect(session).toContain(prompt)
         // The conversation is titled by the name the account resolved, not by
         // its address and not by an automatic summary.
         const titles = records.filter(record => record.type === 'session/title')

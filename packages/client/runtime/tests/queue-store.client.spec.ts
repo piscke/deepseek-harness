@@ -21,7 +21,7 @@ interface QueueFixture {
   id: string
   body: string
   content?: ContentBlock[]
-  placement?: 'queued' | 'steering'
+  placement?: 'queued' | 'steering' | 'context'
   message?: UserMessage
 }
 
@@ -133,6 +133,28 @@ describe('queue snapshot intake', () => {
       { id: 'q-next', placement: 'queued', content: text('later') },
       { id: 's-now', placement: 'steering', content: text('interrupt now') },
     ])
+  })
+
+  it('carries the producer source so a pending context row projects its own provenance', () => {
+    const session = makeSession()
+    const source = {
+      kind: 'plugin', plugin: 'whatsapp-workspace',
+      form: 'notice', summary: 'Ana: oi',
+    }
+    session.handleMuxEnvelope(rid('env-context'), queueFrame([
+      { id: 'q-next', body: 'later' },
+      {
+        id: 'c-waiting', body: '',
+        placement: 'context',
+        message: createUserMessage({ content: text('WhatsApp message from Ana'), source: source as never }),
+      },
+    ]))
+
+    expect(session.getSnapshot().queue.map(item => ({ id: item.id, placement: item.placement, source: item.source })))
+      .toEqual([
+        { id: 'q-next', placement: 'queued', source: { kind: 'user', rpcId: 'rpc-q-next' } },
+        { id: 'c-waiting', placement: 'context', source },
+      ])
   })
 
   it('hands off exactly one current occurrence when live steering becomes durable', async () => {

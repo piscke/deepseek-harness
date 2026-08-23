@@ -59,7 +59,7 @@ export class WhatsAppInboundRouter {
     if (sessionId === undefined) return
     if (!this.seen.admit(message.id)) return
     void this.open(sessionId, message, config).then(
-      (session) => { session.inbox.enqueue(message) },
+      (session) => { session.inbox.enqueue(message, config.inboundDelivery) },
       (error: unknown) => {
         this.ctx.logger.warn(
           `whatsapp-workspace: could not open session "${sessionId}" for chat "${message.chatId}": `

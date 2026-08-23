@@ -6,7 +6,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import { assertNever } from '@deepseek-ai/dsh-llm'
+import { assertNever, boundContextSummary } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type { WhatsAppChatKind, WhatsAppMessage } from '@deepseek-ai/dsh-whatsapp'
 import type { ResolvedConfig } from './index.ts'
@@ -108,7 +108,7 @@ function renderBody(message: WhatsAppMessage): string {
  * `whatsapp_send_message` needs to answer, and reading it out of the turn is
  * more reliable than expecting the model to carry it from session context.
  * @param message - the observed message, as the seam normalized it.
- * @returns the text the follow-up turn carries.
+ * @returns the text the framing carries to the model.
  */
 export function renderInbound(message: WhatsAppMessage): string {
   const chat = message.chatName === undefined ? '' : ` "${message.chatName}"`
@@ -120,4 +120,17 @@ export function renderInbound(message: WhatsAppMessage): string {
     '',
     renderBody(message),
   ].join('\n')
+}
+
+/**
+ * One-line account of a message for the collapsed transcript row, so a message
+ * still waiting to reach the model is readable without expanding it. The sender
+ * leads, because a session already serves one conversation and the addresses
+ * `renderInbound` carries for the model are noise to a reader.
+ * @param message - the observed message, as the seam normalized it.
+ * @returns the account, bounded to the durable `notice` summary limit.
+ */
+export function summarizeInbound(message: WhatsAppMessage): string {
+  const sender = message.senderName ?? message.senderId
+  return boundContextSummary(`${sender}: ${renderBody(message)}`)
 }

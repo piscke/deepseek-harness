@@ -3,9 +3,10 @@
  * Workspace's settings namespace.
  *
  * The card shows one field of that namespace: which conversations open a
- * session. The rest of the namespace — the allow and deny lists, the agent
- * preset — has no control here yet, and a field this card never writes is left
- * exactly as the deployment or another surface left it.
+ * session. The rest of the namespace — the allow and deny lists, the inbound
+ * delivery mode, the agent preset — has no control here yet, and a field this
+ * card never writes is left exactly as the deployment or another surface left
+ * it.
  */
 
 import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
