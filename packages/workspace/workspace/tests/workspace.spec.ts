@@ -941,4 +941,30 @@ describe('registry-global session archive', () => {
     const upgraded = await harness({ pool: legacy })
     expect(upgraded.registry.archivedSessionIds).toEqual([])
   })
+
+  it('unarchives durably, keeps the accounting slot position, and skips ids it does not hold', async () => {
+    const dir = await makeDir('unarchive-home')
+    const result = await harness({
+      sessions: [header('first', dir, 100), header('second', dir, 200), header('third', dir, 300)],
+    })
+    const workspace = result.registry.list()[0]!
+    const accounted = [...workspace.sessionIds]
+    await result.registry.archiveSession(SessionId('first'))
+    await result.registry.archiveSession(SessionId('second'))
+
+    await result.registry.unarchiveSession(SessionId('first'))
+    expect(result.registry.archivedSessionIds).toEqual(['second'])
+    expect(storedState(result.pool).archivedSessionIds).toEqual(['second'])
+    // Archiving never moved the id, so restoring it restores its position.
+    expect([...workspace.sessionIds]).toEqual(accounted)
+
+    const changesAfterFirst = result.changes.filter(change => change.table === '').length
+    await result.registry.unarchiveSession(SessionId('first'))
+    // An id the set does not hold neither rewrites the medium nor emits a change.
+    expect(result.changes.filter(change => change.table === '').length).toBe(changesAfterFirst)
+
+    // A session no longer known is still removable — the entry outlives its log.
+    await result.registry.unarchiveSession(SessionId('ghost'))
+    expect(result.registry.archivedSessionIds).toEqual(['second'])
+  })
 })

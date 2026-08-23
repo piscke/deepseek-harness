@@ -35,6 +35,12 @@ Two filters are policy the deployment cannot turn off. A message the account its
 
 Nothing is filtered by content. `whatsapp/message-received` means a person sent something — a provider drops delivery metadata and protocol housekeeping instead of publishing it — so this package never inspects WhatsApp field names, and a media type it cannot render still enters the session.
 
+### An archived conversation comes back when it speaks
+
+Archiving a conversation in the sidebar hides its row; it does not stop the conversation. The provider keeps delivering, the session keeps its log, and the agent answers as it always did. So a routed message clears its session from the registry-global archive set (`ctx.workspaceRegistry.unarchiveSession`) before delivering, and the row reappears in the slot it never lost — the alternative is a live exchange the operator has no surface to find. A conversation that is not archived costs one synchronous set lookup per message and writes nothing.
+
+The write is not awaited: the row is display state, and a failure warns and leaves the conversation archived rather than delaying the model or dropping the message. Silence the conversation with `denyChatIds`, which is the control that actually stops routing.
+
 ### Every message identifies its chat
 
 A session serves exactly one conversation, and the chat id is still part of every message:
