@@ -1,6 +1,7 @@
-# Agent Note：可运行的 WhatsApp 助手示例
+# Agent Note: 可运行的 WhatsApp 助手示例
 
 Status: implemented
+Archived: 2026-08-25
 
 [English](2026-08-23-whatsapp-assistant-example.md) | 中文
 

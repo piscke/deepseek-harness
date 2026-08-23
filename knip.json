@@ -800,6 +800,11 @@
       "ignoreDependencies": [
         "@deepseek-ai/.+"
       ]
+    },
+    "packages/bundle/whatsapp-app": {
+      "ignoreDependencies": [
+        "@deepseek-ai/.+"
+      ]
     }
   }
 }

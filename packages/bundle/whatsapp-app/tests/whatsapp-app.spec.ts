@@ -1,11 +1,11 @@
 /**
- * The WhatsApp assistant example stays config-only, and the license constraint
- * that shapes it is checked here rather than left to review: `baileys` reaches
- * a GPL-3.0 dependency resolved from git, which this MIT repository's pnpm
- * policy rejects (`ERR_PNPM_EXOTIC_SUBDEP`), so it must appear in no manifest.
- * The rest pins the overlay decisions the README documents as operator
- * contracts: which rows compose, where credentials live, and how the
- * out-of-tree library is named.
+ * The bundle is its patch file, and the license constraint that shapes it is
+ * checked here rather than left to review: `baileys` reaches a GPL-3.0 package
+ * which the 6.x line resolves from git, so this MIT repository declares it in
+ * no manifest and the operator installs it into the profile instead. The rest
+ * pins the composition decisions the README documents as operator contracts:
+ * which rows compose, where credentials live, and how the out-of-tree library
+ * is named.
  */
 
 import { globSync, readFileSync } from 'node:fs'
@@ -20,8 +20,9 @@ interface InsertedRow {
   config?: Record<string, unknown>
 }
 
-const root = resolve(import.meta.dirname, '../../..')
-const overlay = resolve(root, 'examples/whatsapp-assistant/cordis.yml')
+const bundle = resolve(import.meta.dirname, '..')
+const root = resolve(bundle, '../../..')
+const patchFile = resolve(bundle, 'cordis.patch.yml')
 
 const MANIFEST_DEPENDENCY_FIELDS = [
   'dependencies',
@@ -30,7 +31,7 @@ const MANIFEST_DEPENDENCY_FIELDS = [
   'optionalDependencies',
 ] as const
 
-/** The rows the overlay inserts, in composition order. */
+/** The rows the bundle inserts, in composition order. */
 const EXPECTED_ROWS: { id: string; name: string }[] = [
   { id: 'whatsapp', name: '@deepseek-ai/dsh-whatsapp' },
   { id: 'whatsapp-baileys', name: '@deepseek-ai/dsh-whatsapp-baileys' },
@@ -44,17 +45,27 @@ function insertedRows(patches: PatchOptions[]): InsertedRow[] {
   return patches[0]?.insert ?? []
 }
 
-describe('whatsapp-assistant example overlay', () => {
-  const source = readFileSync(overlay, 'utf8')
-  const rows = insertedRows(loadOverlayPatches('whatsapp-assistant-config-test', overlay))
+describe('dsh-whatsapp-app bundle', () => {
+  const source = readFileSync(patchFile, 'utf8')
+  const rows = insertedRows(loadOverlayPatches('whatsapp-app-config-test', patchFile))
+
+  it('declares the patch list through the dsh.bundle.patch manifest field', () => {
+    const manifest = JSON.parse(readFileSync(resolve(bundle, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, string>
+      dsh?: { bundle?: { patch?: string } }
+    }
+    expect(manifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
+    // Every row a bundle mounts resolves from the bundle's own dependencies.
+    for (const row of EXPECTED_ROWS) expect(manifest.dependencies).toHaveProperty(row.name)
+  })
 
   it('composes the seam, the provider, the router, the tool suite, and the pairing page', () => {
     expect(rows.map(row => ({ id: row.id, name: row.name }))).toEqual(EXPECTED_ROWS)
   })
 
-  it('routes conversations by category, which is what makes the two standing sessions appear', () => {
+  it('answers every conversation until a deployment narrows the scope', () => {
     const workspace = rows.find(row => row.id === 'whatsapp-workspace')
-    expect(workspace?.config?.route).toBe('category')
+    expect(workspace?.config?.chats).toBe('all')
   })
 
   it('anchors both the credentials and the conversation directory to the same harness home', () => {
@@ -65,8 +76,10 @@ describe('whatsapp-assistant example overlay', () => {
     expect(source).toContain("directory: !!js dshHomePath('whatsapp', 'chats')")
   })
 
-  it('names the operator-installed library through the environment, defaulting to the bare specifier', () => {
-    expect(source).toContain("moduleSpecifier: !!js process.env.DSH_WHATSAPP_BAILEYS ?? 'baileys'")
+  it('prefers an explicit override, then the profile install, then the bare specifier', () => {
+    expect(source).toContain(
+      "moduleSpecifier: !!js process.env.DSH_WHATSAPP_BAILEYS ?? configModulePath('baileys') ?? 'baileys'",
+    )
   })
 
   it('carries no credential material', () => {

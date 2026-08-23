@@ -6,6 +6,10 @@ WhatsApp seam —— 覆盖**一个已认证的个人 WhatsApp 账号**的[能�
 
 来源：[`packages/whatsapp/whatsapp/src/types.ts`](../../packages/whatsapp/whatsapp/src/types.ts)
 
+## 部署方如何组合它
+
+该 seam 是可选的，因此它以一份组合而非一个标志的形式交付：[`@deepseek-ai/dsh-whatsapp-app`](../../packages/bundle/whatsapp-app/README.md) 是在 Web profile 之上挂载全部四个包与配对页面的 bundle 层，`whatsapp` profile 就是这一层，`dsh whatsapp` 启动它。Baileys 库不出现在这里的任何 manifest 中，因此操作者用 `dsh plugin --profile whatsapp add baileys` 把它安装进该 profile，patch 再通过 `configModulePath('baileys')` 取用它。
+
 ## 一个账号，一条连接
 
 WhatsApp 账号不是按请求使用的凭据：它是一条长期存在的已认证连接，由人工扫描一次二维码授权，并且 WhatsApp 随时可以吊销。因此 `ctx.whatsapp` 把 `status()` 作为能力的一部分上报，而非某次调用的结果；provider 槽位也只容纳一次注册 —— 第二次注册失败于 `WHATSAPP_PROVIDER_ALREADY_REGISTERED`，而不是在两个账号之间做选择。运行两个账号意味着两条彼此隔离的 fiber。

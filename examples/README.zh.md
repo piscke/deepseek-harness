@@ -27,7 +27,3 @@
 ## acp-agent
 
 面向程序化客户端的 ACP（Agent Client Protocol）自动化服务器，支持会话、权限和取消操作。详见 [ACP 示例参考](acp-agent/README.md)。
-
-## whatsapp-assistant
-
-链接一个 WhatsApp 账号的可选 Web overlay：它把收到的消息路由到 `Groups` 与 `Contacts` Session，由 Agent 起草回复，发送前须经操作者批准。Baileys 库由操作者在本仓库之外自行安装，并通过环境变量指明位置。使用 `dsh web --patch examples/whatsapp-assistant/cordis.yml` 启动；该安装方式、配对流程、每账号仅一个连接的规则，以及聊天索引仅限本次连接观察的限制，详见 [whatsapp-assistant/README.md](whatsapp-assistant/README.md)。

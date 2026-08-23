@@ -69,12 +69,12 @@ if (webBundleResolver === undefined) throw new Error('assembled boot: web bundle
 const appBoot = await import(pathToFileURL(webBundleResolver.resolve('@deepseek-ai/dsh-app-boot')).href) as unknown as BootComposition
 
 /**
- * An opt-in composition an operator applies with `dsh web --patch`. Rows it
- * inserts resolve from the app manifest that declares them, not from a bundle.
+ * The bundle layer the `whatsapp` profile adds over the Web profile. Rows it
+ * inserts resolve from the bundle manifest that declares them.
  */
 export const WHATSAPP_ASSISTANT_LAYER: BootLayer = {
-  manifest: join(REPO_ROOT, 'apps/cli/package.json'),
-  patch: join(REPO_ROOT, 'examples/whatsapp-assistant/cordis.yml'),
+  manifest: join(REPO_ROOT, 'packages/bundle/whatsapp-app/package.json'),
+  patch: join(REPO_ROOT, 'packages/bundle/whatsapp-app/cordis.patch.yml'),
 }
 
 function resolvePackageManifest(specifier: string, resolvers: readonly NodeJS.Require[]): string | undefined {

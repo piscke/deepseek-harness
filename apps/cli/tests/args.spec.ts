@@ -21,13 +21,23 @@ function exitCode(argv: string[]): number {
 afterEach(() => { vi.restoreAllMocks() })
 
 describe('parseDshArgs', () => {
-  it('routes profile boots and the web alias, handing the rest to the app', () => {
+  it('routes profile boots and the profile aliases, handing the rest to the app', () => {
     expect(parse(['--profile', 'tui'])).toEqual({ mode: 'profile', profile: 'tui', patches: [], args: [] })
     expect(parse(['--profile', 'tui', '--patch', 'a.yml', '--patch', 'b.yml']))
       .toEqual({ mode: 'profile', profile: 'tui', patches: ['a.yml', 'b.yml'], args: [] })
     expect(parse(['web'])).toEqual({ mode: 'profile', profile: 'web', patches: [], args: [] })
     expect(parse(['web', '--patch', 'web.yml']))
       .toEqual({ mode: 'profile', profile: 'web', patches: ['web.yml'], args: [] })
+    expect(parse(['whatsapp'])).toEqual({ mode: 'profile', profile: 'whatsapp', patches: [], args: [] })
+    expect(parse(['whatsapp', '--patch', 'extra.yml']))
+      .toEqual({ mode: 'profile', profile: 'whatsapp', patches: ['extra.yml'], args: [] })
+    // The alias boots the web app, so the same app flags reach it verbatim.
+    expect(parse(['whatsapp', '--port', '8080', '--no-open']))
+      .toEqual({ mode: 'profile', profile: 'whatsapp', patches: [], args: ['--port', '8080', '--no-open'] })
+    expect(parse(['whatsapp', '--dump-config']))
+      .toEqual({ mode: 'dump-config', profile: 'whatsapp', defaultOnly: false, patches: [] })
+    expect(parse(['whatsapp', '--dump-default-config']))
+      .toEqual({ mode: 'dump-config', profile: 'whatsapp', defaultOnly: true, patches: [] })
   })
 
   it('ends the launcher flags at the first token it does not own', () => {
@@ -87,6 +97,9 @@ describe('parseDshArgs', () => {
     expect(exitCode(['web', '--dump-config', '--dump-default-config'])).toBe(1)
     expect(exitCode(['web', '--dump-default-config', '--patch', 'w.yml'])).toBe(1)
     expect(exitCode(['web', '--patch='])).toBe(1)
+    expect(exitCode(['--profile', 'x', 'whatsapp'])).toBe(1)
+    expect(exitCode(['whatsapp', '--dump-config', '--dump-default-config'])).toBe(1)
+    expect(exitCode(['whatsapp', '--patch='])).toBe(1)
     // A dump never runs app command-line providers, so it cannot show what
     // those flags would decide; printing a tree that differs from the same
     // invocation's boot would mislead.

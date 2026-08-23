@@ -5,11 +5,11 @@
  * code that touches the Baileys module is this one.
  *
  * Baileys is NOT a dependency of this package, in any field. Its transitive
- * `libsignal` is GPL-3.0 and, in the 6.x line, resolves from a git repository,
- * which this repository's supply-chain policy rejects outright. The module is
- * therefore resolved by name at connect time from the deployment's own
- * installation, which is also what makes an operator's install the act that
- * accepts Baileys' license.
+ * `libsignal` is GPL-3.0 while this repository is MIT, and in the 6.x line it
+ * resolves from a git repository, which this repository's supply-chain policy
+ * rejects outright. The module is therefore resolved by name at connect time
+ * from the deployment's own installation, which is also what makes an
+ * operator's install the act that accepts Baileys' license.
  * @module @deepseek-ai/dsh-whatsapp-baileys/src/socket
  */
 
@@ -252,7 +252,9 @@ async function loadModule(load: BaileysLoader, specifier: string): Promise<Baile
     return await load()
   } catch (cause) {
     throw new WhatsAppError(
-      `the WhatsApp library "${specifier}" is not installed in this deployment; install it to enable the WhatsApp provider`,
+      `the WhatsApp library "${specifier}" is not installed in this deployment; `
+      + 'install it into the booted profile with `dsh plugin --profile <name> add baileys`, '
+      + 'or point this provider\'s `moduleSpecifier` at an existing installation',
       'WHATSAPP_BAILEYS_MISSING',
       { cause },
     )

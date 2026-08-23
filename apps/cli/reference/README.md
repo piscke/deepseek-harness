@@ -8,9 +8,9 @@ This reference defines the profile, web-alias, plugin-management, and config-dum
 
 `dsh --profile <name>` boots the profile at `$DSH_HOME/profiles/<name>`. The effective tree is composed over an empty root by applying, in order: each bundle patch named in the profile manifest's `dsh.profile.bundles` list, the profile's own `cordis.patch.yml`, the home-level `$DSH_HOME/cordis.patch.yml` (machine-local preferences shared by every profile, so it outranks the per-profile layer), and each `--patch <path>` overlay in argv order. Later layers win per row; a patch replaces the targeted row's complete `config` value rather than deep-merging keys, and may insert new rows. A parse, schema, resolution, or plugin boot failure is reported and exits nonzero. SIGINT and SIGTERM dispose the mounted root before exit.
 
-Bundle names resolve from the dsh installation first, then from the profile directory. In-box bundles (`@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@deepseek-ai/dsh-headless`) therefore always come from the same installation as the running `dsh`; out-of-tree bundles come from the profile's pnpm-managed `node_modules`. A bare plugin `name` in any patch row resolves through the profile directory's Node parent-walk, which reaches the maintained installation fallback `$DSH_HOME/profiles/node_modules` (one symlink per package the installation's app and bundles depend on, healed on every launch).
+Bundle names resolve from the dsh installation first, then from the profile directory. In-box bundles (`@deepseek-ai/dsh-base`, `@deepseek-ai/dsh-web-app`, `@deepseek-ai/dsh-headless`, `@deepseek-ai/dsh-whatsapp-app`) therefore always come from the same installation as the running `dsh`; out-of-tree bundles come from the profile's pnpm-managed `node_modules`. A bare plugin `name` in any patch row resolves through the profile directory's Node parent-walk, which reaches the maintained installation fallback `$DSH_HOME/profiles/node_modules` (one symlink per package the installation's app and bundles depend on, healed on every launch).
 
-The `web` and `headless` profiles auto-initialize from shipped templates on first use (`web`: base + web-app; `headless`: base + headless). Any other missing profile fails loud with a hint to run `dsh plugin --profile <name> add <package>`.
+The `web`, `headless`, and `whatsapp` profiles auto-initialize from shipped templates on first use (`web`: base + web-app; `headless`: base + headless; `whatsapp`: base + web-app + whatsapp-app). Any other missing profile fails loud with a hint to run `dsh plugin --profile <name> add <package>`.
 
 ### App arguments
 
@@ -83,6 +83,17 @@ All modes treat the invoking directory as the default workspace root, load appli
 New sessions default to the `workspace-write` permission preset. Bash and filesystem mutations are restricted to the session workspace and platform temporary roots; reads, network access, and process visibility are not confined. `DSH_PERMISSION_MODE` changes the process fallback. Stored General-settings permissions affect later Web sessions, not an already-open one.
 
 `DSH_TOOLS_MODE` selects `native`, `code`, or `both` for the process; another value fails at boot. The shipped `minimal` agent preset keeps that deployment presentation, fixes the complete system prompt to `You are a helpful software engineer assistant.`, and composes only persistent `bash` plus `str_replace_editor`. Select 极简模式 when creating a Web session; every other prompt section and model-facing plugin remains absent from that agent while the shared browser, workspace, persistence, sandbox, and permission host stays in place.
+
+## WhatsApp alias
+
+`dsh whatsapp` is a hardcoded alias for `--profile whatsapp`: the same web app with the [WhatsApp assistant](../../../packages/bundle/whatsapp-app/README.md) bundle over it, so every web flag above applies unchanged. The Baileys library is not shipped and must be installed into that profile once; the composition then resolves it from there.
+
+```sh
+dsh plugin --profile whatsapp add baileys
+dsh whatsapp
+```
+
+Pair the account from **Settings › WhatsApp** in the browser on that machine — the page is loopback-only, because the QR links a device with full access to the account. WhatsApp replaces an existing linked device, so run one WhatsApp harness per `DSH_HOME`, and a second account from a second home. Without the library the provider reports `WHATSAPP_BAILEYS_MISSING` and stays down while the rest of the app runs.
 
 ## Shared deployment behavior
 

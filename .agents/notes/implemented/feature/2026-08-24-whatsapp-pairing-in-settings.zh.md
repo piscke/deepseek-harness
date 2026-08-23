@@ -12,7 +12,7 @@ WhatsApp 接缝从发布起就会报告 `{ state: 'pairing', qr }`，并在每�
 
 ## 决定
 
-[`@deepseek-ai/dsh-client-ui-settings-whatsapp`](../../../../packages/client/ui-settings-whatsapp/README.md) 为 Web 设置贡献一个 **WhatsApp** 页面（`settings.section`，id 为 `whatsapp`，order 为 25），展示连接状态，并在账号处于配对中时展示实时二维码。[`examples/whatsapp-assistant`](../../../../examples/whatsapp-assistant/README.md) 插入它的行，因此该页面恰好存在于组合了 WhatsApp 的地方；页面的存在即是能力检查，无需用插件清单探测来决定要不要画它。
+[`@deepseek-ai/dsh-client-ui-settings-whatsapp`](../../../../packages/client/ui-settings-whatsapp/README.md) 为 Web 设置贡献一个 **WhatsApp** 页面（`settings.section`，id 为 `whatsapp`，order 为 25），展示连接状态，并在账号处于配对中时展示实时二维码。[`@deepseek-ai/dsh-whatsapp-app`](../../../../packages/bundle/whatsapp-app/README.md) 插入它的行，因此该页面恰好存在于组合了 WhatsApp 的地方；页面的存在即是能力检查，无需用插件清单探测来决定要不要画它。
 
 本包注册自己的 Connection RPC 通道，而不是搭载共享平面：
 
@@ -44,7 +44,7 @@ ctx.connection.rpc.handle('/whatsapp', handler, { authority: 'loopback' })
 
 包级测试对两半都做到逐文件覆盖：Host 半边的端点分派与其他端点的 `bad-request`；浏览器半边的注册（inject 列表、id、order、本地化标签、语言切换、slot 延迟声明、teardown）、读取器的成功/错误/无法解码路径、页面的每一个状态分支、轮询节奏、卸载时的取消，以及读取失败后的重试。
 
-`packages/client/connection` 的 fixture 传输现在也服务 `/whatsapp`，由 `?fixtureWhatsApp=pairing|online|offline|connecting|logged-out` 选择分支，使组装后的 Web 测试环境无需账号即可驱动每个分支。`apps/cli/tests/whatsapp-assistant-config.spec.ts` 固定了覆盖层的第五行。
+`packages/client/connection` 的 fixture 传输现在也服务 `/whatsapp`，由 `?fixtureWhatsApp=pairing|online|offline|connecting|logged-out` 选择分支，使组装后的 Web 测试环境无需账号即可驱动每个分支。`packages/bundle/whatsapp-app/tests/whatsapp-app.spec.ts` 固定了该 patch 的第五行。
 
 `apps/web/tests/whatsapp-settings.snapshot.ts` 以应用了该覆盖层的方式启动构建产物的浏览器图，打开设置、选中 WhatsApp，固定配对卡片及其渲染出的 `<svg>` 二维码与凭据警告、已连接的账号，以及未应用覆盖层时 WhatsApp 页面不存在这一事实。为此，jsdom 启动测试环境（`apps/web/tests/assembled-boot.ts`）必须像 `dsh web` 那样接受同样的 `--patch` 层，而不再只组合随附 bundle；否则任何可选装的插件行都无法出现在组装后的记录中。
 

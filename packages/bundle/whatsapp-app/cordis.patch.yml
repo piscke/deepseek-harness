@@ -1,20 +1,20 @@
-# Opt-in WhatsApp assistant over the shipped Web composition: the capability
-# seam, one Baileys connection, the Workspace router, the model-facing tools,
-# and the Settings page that pairs the account. The Web surface already owns the
-# approval prompt and the Workspace sidebar.
+# The dsh-whatsapp-app bundle patch: the WhatsApp assistant over the
+# dsh-web-app layer. The capability seam, one Baileys connection, the Workspace
+# router, the model-facing tools, and the Settings page that pairs the account.
+# The Web surface already owns the approval prompt and the Workspace sidebar.
 #
-#   dsh web --patch examples/whatsapp-assistant/cordis.yml
+#   dsh whatsapp
 #
 # Pair the account from Settings › WhatsApp in the local browser: the page shows
 # the connection state and, while the account is pairing, the live QR. That page
 # is loopback-only, because whoever scans the code links a device with full
 # access to the account.
 #
-# Baileys is installed by the OPERATOR, outside this workspace, and must not be
-# added to any manifest here: it reaches a GPL-3.0 package resolved from git,
-# which this MIT repository's pnpm policy rejects outright. Name that install
-# through DSH_WHATSAPP_BAILEYS; without it the provider reports
-# WHATSAPP_BAILEYS_MISSING and every account operation fails.
+# Baileys is installed by the OPERATOR into the profile, and must not be added
+# to any manifest here: the 6.x line reaches a GPL-3.0 package resolved from
+# git, which pnpm refuses as a subdependency.
+#
+#   dsh plugin --profile whatsapp add baileys
 #
 # This composition sends personal conversations to the LLM provider and writes
 # them to the session log. It is as sensitive as the phone it links to.
@@ -27,11 +27,15 @@
     # these credentials closes the first with a `conflict` stream error. Pinning
     # the directory under the harness home instead of the provider's
     # cwd-relative default makes "one connection per account" the same rule as
-    # "one `dsh web` per DSH_HOME", which an operator can actually check.
+    # "one `dsh` per DSH_HOME", which an operator can actually check.
     - id: whatsapp-baileys
       name: '@deepseek-ai/dsh-whatsapp-baileys'
       config:
-        moduleSpecifier: !!js process.env.DSH_WHATSAPP_BAILEYS ?? 'baileys'
+        # Precedence, highest first: an operator naming the library explicitly,
+        # the profile's own dependency, then the bare name — which only resolves
+        # when the library sits in the harness installation, and otherwise
+        # leaves the provider reporting WHATSAPP_BAILEYS_MISSING.
+        moduleSpecifier: !!js process.env.DSH_WHATSAPP_BAILEYS ?? configModulePath('baileys') ?? 'baileys'
         authDir: !!js dshHomePath('whatsapp', 'auth')
 
     - id: whatsapp-workspace

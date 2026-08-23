@@ -16,7 +16,7 @@ The card renders only where the Workspace is composed: a namespace no Host serve
 
 The namespace name is spelled here rather than imported, because a client package must not depend on a Host package; a test pins the constant against the Workspace's own export.
 
-Composing the package is what creates the page, so its presence is the capability check: a harness without WhatsApp shows no WhatsApp page rather than an empty one. [`examples/whatsapp-assistant`](../../../examples/whatsapp-assistant/README.md) inserts the row.
+Composing the package is what creates the page, so its presence is the capability check: a harness without WhatsApp shows no WhatsApp page rather than an empty one. [`@deepseek-ai/dsh-whatsapp-app`](../../bundle/whatsapp-app/README.md) inserts the row.
 
 ## Model Experience
 
