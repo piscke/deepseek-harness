@@ -3,8 +3,8 @@
     "kind": "chunks",
     "chunks": [
       { "type": "block-start", "index": 0, "blockType": "text" },
-      { "type": "text-delta", "index": 0, "text": "Anotado: Ana confirma as 18h." },
-      { "type": "block-end", "index": 0, "block": { "type": "text", "text": "Anotado: Ana confirma as 18h." } },
+      { "type": "text-delta", "index": 0, "text": "A Ana confirmou o horario das 18h." },
+      { "type": "block-end", "index": 0, "block": { "type": "text", "text": "A Ana confirmou o horario das 18h." } },
       { "type": "usage", "usage": { "inputTokens": 12, "outputTokens": 6 } },
       { "type": "finish", "reason": { "kind": "stop" } }
     ]

@@ -317,6 +317,14 @@ export interface QueuedMessage {
   readonly messageId: MessageId
   /** Agent-resolved placement; only queued rows accept queue mutations. */
   readonly placement: 'queued' | 'steering' | 'context'
+  /**
+   * Producer of the pending message, exactly as the host holds it. A `context`
+   * row projects its provenance from this before it is claimed, so it looks the
+   * same pending as it does once durable. Opaque like every other source this
+   * UI reads: `MessageSource` is merge-extensible, so no client-side union can
+   * be exhaustive.
+   */
+  readonly source: unknown
   /** Complete content used to render pending steering before it becomes durable. */
   readonly content: readonly ContentBlock[]
   readonly preview: string
@@ -446,7 +454,7 @@ export interface ConversationSnapshot {
   partial: PartialAssistant | null
   runningCalls: readonly RunningToolCall[]
   pending: readonly PendingInteraction[]
-  /** Authoritative transient inbox snapshot, including queued and steering placements. */
+  /** Authoritative transient inbox snapshot, including queued, steering, and pending-context placements. */
   queue: readonly QueuedMessage[]
   running: boolean
   /**

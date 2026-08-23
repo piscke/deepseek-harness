@@ -29,6 +29,7 @@ function row(id: string, text: string | null, preview = text ?? '[image]'): Queu
   return {
     id: iid(id), messageId: `message-${id}` as never, placement: 'queued',
     content: text === null ? [{ type: 'image', data: 'x' } as never] : [{ type: 'text', text }],
+    source: { kind: 'user' },
     preview, text,
   }
 }

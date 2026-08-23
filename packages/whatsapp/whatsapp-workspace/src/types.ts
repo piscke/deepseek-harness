@@ -20,6 +20,18 @@ import type { WhatsAppChatKind, WhatsAppContent } from '@deepseek-ai/dsh-whatsap
  */
 export type WhatsAppChatScope = 'all' | 'groups' | 'contacts'
 
+/**
+ * How a delivered message reaches the model. A CLOSED union: consumers `switch`
+ * on it ending in `assertNever`, so a new mode breaks compilation.
+ *
+ * - `context` — the framing is queued as pending model-facing context and waits
+ *   there. The operator's next prompt in that conversation is what carries it
+ *   into a request, so an inbound message costs no turn of its own.
+ * - `turn` — the framing opens its own follow-up turn, so the agent answers
+ *   every message without an operator present.
+ */
+export type WhatsAppInboundDelivery = 'context' | 'turn'
+
 /** The session one routed message belongs to, plus the title that session is pinned to. */
 export interface WhatsAppRouteTarget {
   /** Deterministic session identity, so a restart resumes the same conversation. */
@@ -51,10 +63,11 @@ export interface WhatsAppInboundEvent {
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     /**
-     * One inbound WhatsApp message was delivered to this session as a
-     * follow-up turn. The turn's `user/message` carries the framing the model
-     * reads; this event carries the WhatsApp identity behind it, which the
-     * framing text cannot be parsed back into.
+     * One inbound WhatsApp message was delivered to this session, as pending
+     * context or as a follow-up turn. The `user/message` that eventually
+     * carries the framing is what the model reads; this event carries the
+     * WhatsApp identity behind it, which the framing text cannot be parsed
+     * back into.
      */
     'whatsapp/inbound': WhatsAppInboundEvent
   }

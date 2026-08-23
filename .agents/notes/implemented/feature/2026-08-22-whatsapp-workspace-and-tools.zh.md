@@ -28,7 +28,7 @@ Status: implemented
 
 `route` 必填且没有默认值：`category`（一个 `Groups` 会话与一个 `Contacts` 会话）、`per-chat`（每段对话一个会话，首次接触时打开）或 `single`（全部合一）。`allowChatIds` 非空时即是穷尽列表，而 `denyChatIds` 优先于它。
 
-形态选择没有存活下来：[每段对话一个会话](2026-08-25-whatsapp-session-per-conversation.md)移除了 `route`、`category` 与 `single`，代之以 `chats`——它决定*哪些*对话拥有自己的会话。以下关于过滤、框架文本、投递、日志与工具的一切均未改变。
+形态选择没有存活下来：[每段对话一个会话](2026-08-25-whatsapp-session-per-conversation.md)移除了 `route`、`category` 与 `single`，代之以 `chats`——它决定*哪些*对话拥有自己的会话。投递单位同样没有：[入站作为待处理上下文](2026-08-26-whatsapp-inbound-as-pending-context.md)把每条消息一个后续轮次改为需显式选择的 `inboundDelivery: turn`，默认改为把框架文本作为待处理上下文保留、由操作者的下一条提示带入。以下关于过滤、框架文本、日志与工具的一切均未改变，投递拒绝打断运行中轮次这一点也未改变。
 
 有两条过滤源自 seam 自身的契约，不可配置。`fromMe` 消息永不路由——把部署自己的回答再送回去会用它自己的话唤醒 agent，而 seam 有意上报它们是因为状态显示需要。已投递过的消息 id 会被丢弃，因为 seam 的契约就是 provider 在重连后会重放历史。
 

@@ -42,7 +42,7 @@ SlotRegistry gives the renderer separate bare observables for `useSessions` and 
 
 ## Pending queue projection
 
-`ConversationSnapshot.queue` is the Host's authoritative transient snapshot of `agent.inbox.nextTurn`; pending next-step steering stays outside this projection. Each row carries its `MessageId`, complete editable text when every content block is text, and a flattened preview. The Host derives whole `session/queue` snapshots from durable `agent/inbox/spliced` mutations and sends a baseline on reconnect; the message-local `agent/inbox/inserted`, `claimed`, and `discarded` notifications are not used to reconstruct this projection. `Session.updateQueue()` sends edit/remove operations through Host-side `Inbox.splice()` without optimistic client mutation, so the next Host snapshot is the sole visible commit and a claim race can surface `queue-item-not-found`.
+`ConversationSnapshot.queue` is the Host's authoritative transient snapshot of `agent.inbox.nextTurn` plus the pending `next-step` work, each row tagged with its placement (`queued`, `steering`, or `context`). Each row carries its `MessageId`, its durable `MessageSource`, complete editable text when every content block is text, and a flattened preview. The Host derives whole `session/queue` snapshots from durable `agent/inbox/spliced` mutations and sends a baseline on reconnect; the message-local `agent/inbox/inserted`, `claimed`, and `discarded` notifications are not used to reconstruct this projection. `Session.updateQueue()` sends edit/remove operations through Host-side `Inbox.splice()` without optimistic client mutation, so the next Host snapshot is the sole visible commit and a claim race can surface `queue-item-not-found`.
 
 ## Conversation assembly
 

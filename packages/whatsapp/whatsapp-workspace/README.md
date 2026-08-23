@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-The WhatsApp Workspace: a dedicated directory registered as a [Workspace](../../workspace/workspace/README.md), one session per conversation inside it, and the delivery of the account's inbound stream into those sessions as queued follow-up turns.
+The WhatsApp Workspace: a dedicated directory registered as a [Workspace](../../workspace/workspace/README.md), one session per conversation inside it, and the delivery of the account's inbound stream into those sessions as pending context the operator's next prompt carries into a request.
 
 This is a Consumer of the [WhatsApp capability seam](../whatsapp/README.md) (`ctx.whatsapp`). It registers no provider and no tool — answering a conversation is [`dsh-tool-whatsapp`](../tool-whatsapp/README.md).
 
@@ -33,7 +33,7 @@ One conversation is one session, always. A contact and a group each get their ow
 
 Two filters are policy the deployment cannot turn off. A message the account itself wrote (`fromMe`, including from another device) is never routed, because delivering the deployment's own answer back would wake the agent with its own words. A message id already delivered is dropped, because a provider replays history after a reconnection.
 
-Nothing is filtered by content. `whatsapp/message-received` means a person sent something — a provider drops delivery metadata and protocol housekeeping instead of publishing it — so this package never inspects WhatsApp field names, and a media type it cannot render still becomes a turn.
+Nothing is filtered by content. `whatsapp/message-received` means a person sent something — a provider drops delivery metadata and protocol housekeeping instead of publishing it — so this package never inspects WhatsApp field names, and a media type it cannot render still enters the session.
 
 ### Every message identifies its chat
 
@@ -49,11 +49,20 @@ boa tarde, você pode confirmar o horário?
 
 That `[chat_id: …]` header is exactly the value `whatsapp_send_message` requires, so answering the right person is a copy out of the turn rather than a fact the model has to carry from session context.
 
-## Queued delivery, never an interruption
+## Delivery: pending context, not an automatic turn
 
-A message that arrives while the agent is mid-turn waits for the turn to end. Delivery claims the agent's idle phase through `runMaintenance`, so the framing enters the log and the agent's inbox between turns; a claim refused because a turn owns the agent parks on `whenIdle()` and retries at the next boundary, with the batch put back at the head so arrival order survives.
+An arriving message does not spend a model request. `inboundDelivery` decides what a routed message does:
 
-Delivery is serial per session and coalesced: everything queued at the moment a claim succeeds is delivered inside it, so a burst of messages becomes one wake-up rather than one per message. Each message is still its own follow-up turn.
+| Mode | Delivery |
+|---|---|
+| `context` (default) | The framing is injected at the next-step inbox boundary and wakes nothing. It stays pending — visible at the tail of the conversation in the Web UI — until the operator writes their next prompt in that conversation, and the inbox claims it ahead of that prompt, so the message is context the answer is written against. |
+| `turn` | The framing opens its own follow-up turn, which is how an account answers without an operator in front of it. |
+
+Pending context is durable (`agent/inbox/spliced`), so a message waiting when the process stops is still waiting after a restart.
+
+A message that arrives while the agent is mid-turn waits for the turn to end. Delivery claims the agent's idle phase through `runMaintenance`, so the framing enters the log and the agent's inbox between turns; a claim refused because a turn owns the agent parks on `whenIdle()` and retries at the next boundary, with the batch put back at the head so arrival order survives. Under `context` that claim is also what keeps a message out of a turn already in flight, which would otherwise consume it at that turn's next step boundary — answering it unasked.
+
+Delivery is serial per session and coalesced: everything queued at the moment a claim succeeds is delivered inside it, so a burst of messages is one claim rather than one per message.
 
 One message's failure is contained. A message the log refuses is warned about and dropped, and the queue behind it keeps moving — one unloggable message cannot silence a conversation.
 
@@ -81,7 +90,7 @@ Changing `agentPreset` applies to conversations opened afterwards. A session alr
 
 ## Live settings
 
-`chats`, `allowChatIds`, `denyChatIds`, and `agentPreset` are also a settings section, edited in Settings › WhatsApp beside the pairing QR code ([`dsh-client-ui-settings-whatsapp`](../../client/ui-settings-whatsapp/README.md)). The router reads the authoritative policy per message, so a scope change applies to the next message without a reload; an `agentPreset` change applies to the next conversation opened.
+`chats`, `allowChatIds`, `denyChatIds`, `inboundDelivery`, and `agentPreset` are also a settings section, edited in Settings › WhatsApp beside the pairing QR code ([`dsh-client-ui-settings-whatsapp`](../../client/ui-settings-whatsapp/README.md)). The router reads the authoritative policy per message, so a scope or delivery change applies to the next message without a reload; an `agentPreset` change applies to the next conversation opened.
 
 `directory` and `workspaceTitle` are deliberately outside the section: they decide the Workspace's identity, which is fixed when the plugin loads and cannot change under sessions already attached to it.
 
@@ -96,6 +105,7 @@ A field the stored document leaves unset keeps the composition entry's value, so
 | `chats` | `all` | Which conversations open a session: `all`, `groups`, or `contacts`. |
 | `allowChatIds` | `[]` | When non-empty, the only conversations routed. |
 | `denyChatIds` | `[]` | Conversations never routed. |
+| `inboundDelivery` | `context` | What a routed message does: `context` waits for the operator's next prompt, `turn` opens its own follow-up turn. |
 | `agentPreset` | *(none)* | Preset mounted on each conversation session as it is created. |
 | `seenMessageLimit` | `1000` | How many delivered message ids are remembered to suppress a provider's history replay. |
 
@@ -114,7 +124,7 @@ A field the stored document leaves unset keeps the composition entry's value, so
 
 | Event | Appended when |
 |---|---|
-| `whatsapp/inbound` | One inbound message is about to enter the session, before the follow-up turn is queued. |
+| `whatsapp/inbound` | One inbound message is about to enter the session, before it is injected or queued. |
 
 Appending first keeps model-visible ⟺ logged true in the failing direction: a message the log could not record never reaches the model. The outbound half (`whatsapp/outbound`) belongs to [`dsh-tool-whatsapp`](../tool-whatsapp/README.md). `./invariant` validates every stored `whatsapp/inbound` record.
 
@@ -124,7 +134,7 @@ Appending first keeps model-visible ⟺ logged true in the failing direction: a 
 
 #### What the model sees
 
-Each routed message arrives as its own follow-up turn carrying a plugin-sourced user message: a header line naming the chat kind, the conversation's display name when the account resolved one, and `[chat_id: <id>]`; a `From:` line; a `Sent:` line; a blank line; and the body. Media the seam cannot represent renders as `[unsupported media: <type>]` rather than vanishing.
+Each routed message arrives as a plugin-sourced user message declaring the `notice` form: a header line naming the chat kind, the conversation's display name when the account resolved one, and `[chat_id: <id>]`; a `From:` line; a `Sent:` line; a blank line; and the body. Media the seam cannot represent renders as `[unsupported media: <type>]` rather than vanishing. The source also carries a one-line summary (`Ana: alguém pode buscar o bolo?`), which is what the transcript row shows collapsed — so a message still waiting for the operator is readable without expanding it. Under `context` the framing is claimed at the pre-step of the turn the operator's next prompt opens and lands ahead of that prompt: the model reads what arrived, then what it was asked about it.
 
 ##### One delivered message
 
@@ -138,7 +148,7 @@ alguém pode buscar o bolo?
 
 #### Token effect
 
-One framing per delivered message, roughly four short lines plus the body, retained in the session until compaction. A burst delivers as several messages inside one turn boundary, not one turn each.
+One framing per delivered message, roughly four short lines plus the body, retained in the session until compaction. Under `context` a burst costs no requests at all until the operator writes, and then rides one request together.
 
 #### KV Cache effect
 
@@ -147,7 +157,9 @@ Append-only; each framing follows the reusable request prefix and does not inval
 ## Known Limitations and Deferred Work
 
 - **Nothing here is verified against a real WhatsApp account** — routing, queueing, and session lifecycle are covered by unit and composition tests against a scripted seam. Behavior under a live provider is unverified.
-- **Routing trusts the seam's rule that an inbound event is a human message** — this package makes no content judgment of its own, so a provider that published delivery metadata or protocol housekeeping would spend a turn on it. That is the provider's bug to fix, and duplicating the judgment here would silently drop real media the moment the two lists drifted.
+- **Routing trusts the seam's rule that an inbound event is a human message** — this package makes no content judgment of its own, so a provider that published delivery metadata or protocol housekeeping would put it in front of the model. That is the provider's bug to fix, and duplicating the judgment here would silently drop real media the moment the two lists drifted.
+- **Cancelling a conversation discards what never reached the model** — `agent.cancel()` clears pending inbox work, so messages waiting under `context` are dropped from the request they would have ridden. The durable `whatsapp/inbound` records still hold them.
+- **Pending context accumulates without a cap** — with no automatic turn, a busy conversation keeps injecting until the operator writes, and every waiting message rides that one request. `chats`, `allowChatIds`, and `denyChatIds` are the controls; a per-conversation cap is deferred.
 - **Deduplication is in-memory** — `seenMessageLimit` ids live with the plugin, so a restart can redeliver a message the provider replays. The durable `whatsapp/inbound` log knows better; consulting it at load is deferred.
 - **The agent's reply is not sent anywhere** — this package delivers messages into a session. Whether the agent answers, and to whom, is the model's decision through `whatsapp_send_message`, which asks the operator every time. There is no auto-reply path, by design.
 - **Sessions open without bound** — one session per conversation, created on first contact, with no eviction and no cap. `chats`, `allowChatIds`, and `denyChatIds` are the controls an account with many conversations has.

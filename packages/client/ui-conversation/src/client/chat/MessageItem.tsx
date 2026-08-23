@@ -1,13 +1,15 @@
 // MessageItem: simple chat nodes — user and consumed-steering bubbles
 // (right-aligned, with clock + copy IconActions; branch lives only under
-// assistant answers), pending steering (copy only), context injection,
-// compaction marker, retry disclosure, and unknown-surface JSON rows.
+// assistant answers), pending steering (copy only), context injection
+// (durable and still-pending), compaction marker, retry disclosure, and
+// unknown-surface JSON rows.
 
 import { memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
-  ModelRetryNode, TurnErrorNode, UserMessageNode,
+  ContextMessageNode, ModelRetryNode, TurnErrorNode, UserMessageNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
+import { contextForm, contextProvenance } from '@deepseek-ai/dsh-client-runtime/client'
 import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
 import { ReferenceIcon } from '../reference/ReferenceIcon.tsx'
@@ -273,6 +275,31 @@ export function PendingSteeringBubble({ content, renderMessageImages, t }: {
           t={t}
         />
       )}
+    />
+  )
+}
+
+/**
+ * Render one Host-authoritative pending injected-context item with the same
+ * visual language as its eventual durable transcript node.
+ *
+ * Provenance and form are projected here from the pending source, because the
+ * Host streams the raw message and only the durable projection precomputes them.
+ * @param props - Pending message content, its opaque producer source, and the conversation translator.
+ * @returns the pending context row.
+ */
+export function PendingContextRow({ content, source, t }: {
+  content: ContextMessageNode['content']
+  source: ContextMessageNode['source']
+  t: ChatViewSlotProps['t']
+}): ReactNode {
+  return (
+    <ContextInjectionRow
+      content={content}
+      source={source}
+      provenance={contextProvenance(source)}
+      form={contextForm(source)}
+      t={t}
     />
   )
 }

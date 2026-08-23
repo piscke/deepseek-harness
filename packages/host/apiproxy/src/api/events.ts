@@ -37,7 +37,7 @@ export type ToolEventView =
 export interface QueuedInboxItem {
   /** Message identity used by inbox mutations. */
   id: MessageId
-  /** Agent-resolved FIFO placement; queued and steering items render on different surfaces, context items stay invisible until claimed. */
+  /** Agent-resolved FIFO placement; queued, steering, and pending-context items each render on their own surface. */
   placement: 'queued' | 'steering' | 'context'
   /** Complete pending message; it is not durable until the Agent claims it. */
   message: Message
@@ -78,8 +78,9 @@ export type MuxFrame =
    * discard. Pending work is not model-visible and therefore has no durable
    * session event; the whole snapshot makes edit, deletion, cancel, and
    * reconnect converge through one authoritative signal. `session/queue`
-   * covers both resolved placements: queued items render
-   * in QueueDock, while pending steering renders at the conversation tail.
+   * covers all three resolved placements: queued items render in QueueDock,
+   * while pending steering and pending injected context render at the
+   * conversation tail.
    */
   | { type: 'session/queue'; sessionId: SessionId; items: QueuedInboxItem[] }
   /**

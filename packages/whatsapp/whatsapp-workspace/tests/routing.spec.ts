@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { homedir, tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
+import { CONTEXT_SUMMARY_MAX_CHARS } from '@deepseek-ai/dsh-llm'
 import { WhatsAppChatId, WhatsAppMessageId, type WhatsAppMessage } from '@deepseek-ai/dsh-whatsapp'
 import {
   SeenMessages,
@@ -13,6 +14,7 @@ import {
   resolveDirectory,
   routeMessage,
   settingsBase,
+  summarizeInbound,
 } from '../src/index.ts'
 import type { ResolvedConfig } from '../src/index.ts'
 
@@ -26,6 +28,7 @@ function config(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
     chats: 'all',
     allowChatIds: [],
     denyChatIds: [],
+    inboundDelivery: 'context',
     seenMessageLimit: 1000,
     ...overrides,
   }
@@ -109,7 +112,7 @@ describe('routing', () => {
 describe('live settings', () => {
   it('offers the composition entry as the base layer of the user-writable slice', () => {
     expect(settingsBase(config({ chats: 'groups', denyChatIds: [anaId] })))
-      .toEqual({ chats: 'groups', allowChatIds: [], denyChatIds: [anaId] })
+      .toEqual({ chats: 'groups', allowChatIds: [], denyChatIds: [anaId], inboundDelivery: 'context' })
     expect(settingsBase(config({ agentPreset: 'interpreter' })).agentPreset).toBe('interpreter')
   })
 
@@ -120,6 +123,8 @@ describe('live settings', () => {
     expect(applySettings(entry, {})).toEqual(entry)
     expect(applySettings(entry, { allowChatIds: [anaId], denyChatIds: [groupId], agentPreset: 'other' }))
       .toEqual({ ...entry, allowChatIds: [anaId], denyChatIds: [groupId], agentPreset: 'other' })
+    expect(applySettings(entry, { inboundDelivery: 'turn' }))
+      .toEqual({ ...entry, inboundDelivery: 'turn' })
   })
 
   it('judges the next message against the folded policy', () => {
@@ -145,6 +150,19 @@ describe('inbound framing', () => {
     const text = renderInbound(message({}, ['chatName', 'senderName']))
     expect(text).toContain(`WhatsApp message in direct chat [chat_id: ${anaId}]`)
     expect(text).toContain(`From: ${anaId}`)
+  })
+
+  it('accounts for a waiting message in one line, led by the sender', () => {
+    expect(summarizeInbound(message())).toBe('Ana: oi')
+    expect(summarizeInbound(message({}, ['senderName']))).toBe(`${anaId}: oi`)
+    expect(summarizeInbound(message({ content: { kind: 'unsupported', mediaType: 'video/mp4' } })))
+      .toBe('Ana: [unsupported media: video/mp4]')
+  })
+
+  it('bounds the account so one long message cannot take over the row', () => {
+    const summary = summarizeInbound(message({ content: { kind: 'text', text: 'x'.repeat(400) } }))
+    expect(summary).toHaveLength(CONTEXT_SUMMARY_MAX_CHARS)
+    expect(summary.endsWith('…')).toBe(true)
   })
 
   it('names the media type of a body the seam cannot represent', () => {

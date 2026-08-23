@@ -152,6 +152,7 @@ describe('InputHub queue steering (empty-draft accelerated Enter)', () => {
     messageId: `message-${id}` as never,
     placement: 'queued',
     content: [{ type: 'text', text: id }],
+    source: { kind: 'user' },
     preview: id,
     text: id,
   })

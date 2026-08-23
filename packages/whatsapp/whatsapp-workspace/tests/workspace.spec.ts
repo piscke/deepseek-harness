@@ -82,12 +82,21 @@ function provider(names: Record<string, string>): WhatsAppProvider {
 
 /** A live agent stand-in exposing the phase control the inbox drives. */
 class StubAgent {
+  /** Every framing this agent received, whichever delivery mode carried it. */
+  readonly delivered: UserMessage[] = []
   readonly followups: UserMessage[] = []
+  readonly injections: UserMessage[] = []
 
   constructor(readonly id: SessionId, readonly session: Session) {}
 
   followup(message: UserMessage): void {
     this.followups.push(message)
+    this.delivered.push(message)
+  }
+
+  inject(message: UserMessage): void {
+    this.injections.push(message)
+    this.delivered.push(message)
   }
 
   runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T> {
@@ -236,7 +245,7 @@ describe('the WhatsApp Workspace', () => {
     expect(ana?.logged()).toEqual(['M1'])
     expect(ana?.session.header.cwd).toBe(root)
     expect(ctx.sessionTitle.get(ana?.session as Session)?.title).toBe('Ana Silva')
-    const text = ana?.followups[0]?.content.map(block => block.type === 'text' ? block.text : '').join('')
+    const text = ana?.delivered[0]?.content.map(block => block.type === 'text' ? block.text : '').join('')
     expect(text).toContain(`[chat_id: ${anaId}]`)
     // The account named no group here, so the message's own name is the title.
     expect(ctx.sessionTitle.get(agents.get(chatSessionId(groupId))?.session as Session)?.title).toBe('Time')

@@ -1014,15 +1014,16 @@ Source: [`packages/web/web-search-deepseek/src/provider.ts:83`](../packages/web/
 
 ```ts persistence-catalog
 /**
- * One inbound WhatsApp message was delivered to this session as a
- * follow-up turn. The turn's `user/message` carries the framing the model
- * reads; this event carries the WhatsApp identity behind it, which the
- * framing text cannot be parsed back into.
+ * One inbound WhatsApp message was delivered to this session, as pending
+ * context or as a follow-up turn. The `user/message` that eventually
+ * carries the framing is what the model reads; this event carries the
+ * WhatsApp identity behind it, which the framing text cannot be parsed
+ * back into.
  */
 'whatsapp/inbound': WhatsAppInboundEvent
 ```
 
-Source: [`packages/whatsapp/whatsapp-workspace/src/types.ts:59`](../packages/whatsapp/whatsapp-workspace/src/types.ts)
+Source: [`packages/whatsapp/whatsapp-workspace/src/types.ts:72`](../packages/whatsapp/whatsapp-workspace/src/types.ts)
 
 <a id="whatsappoutbound--log-only"></a>
 

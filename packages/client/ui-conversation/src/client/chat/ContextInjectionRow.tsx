@@ -19,14 +19,19 @@ export interface ContextInjectionRowProps {
 }
 
 /**
- * Render logged context with the Tool calls disclosure chrome from Figma.
+ * Render context with the Tool calls disclosure chrome from Figma.
  *
  * The header names the role the context plays and, beside it, the producer the
- * durable source identifies, so a reader can tell an injected skill catalog
- * from a workspace instruction file or a recalled session without expanding.
- * The expanded body follows the producer-declared form; an absent or unknown
- * form renders the opaque body.
- * @param props - Durable content, its projected producer role/name and form, and the locale seat.
+ * source identifies, so a reader can tell an injected skill catalog from a
+ * workspace instruction file or a recalled session without expanding. The
+ * expanded body follows the producer-declared form; an absent or unknown form
+ * renders the opaque body.
+ *
+ * Context still pending in the inbox renders through this same component as the
+ * durable node it becomes, so a message an operator has not yet sent to the
+ * model does not change appearance the moment it is claimed. The two differ
+ * only in the marker their owning seat carries.
+ * @param props - Content, its projected producer role and name, its form, and the locale seat.
  * @returns A collapsed context row with a bounded, form-specific body.
  */
 export function ContextInjectionRow({ content, source, provenance, form, t }: ContextInjectionRowProps) {

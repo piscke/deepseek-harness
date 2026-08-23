@@ -456,6 +456,7 @@ describe('ChatView', () => {
       messageId: 'steer-message' as never,
       placement: 'steering' as const,
       content: [{ type: 'text' as const, text: 'interrupt now' }],
+      source: { kind: 'user' },
       preview: 'interrupt now',
       text: 'interrupt now',
     }
@@ -464,6 +465,7 @@ describe('ChatView', () => {
       messageId: 'queued-message' as never,
       placement: 'queued' as const,
       content: [{ type: 'text' as const, text: 'later' }],
+      source: { kind: 'user' },
       preview: 'later',
       text: 'later',
     }
@@ -514,12 +516,57 @@ describe('ChatView', () => {
     expect(h.forkAt).toHaveBeenCalledWith(1)
   })
 
+  it('renders Host-pending injected context at the flow tail and hands off to the durable node', () => {
+    const source = {
+      kind: 'plugin', plugin: 'whatsapp-workspace',
+      form: 'notice', summary: 'Ana: oi',
+    }
+    const pending = {
+      id: 'context-occurrence' as never,
+      messageId: 'context-message' as never,
+      placement: 'context' as const,
+      content: [{ type: 'text' as const, text: 'WhatsApp message from Ana' }],
+      source,
+      preview: 'WhatsApp message from Ana',
+      text: 'WhatsApp message from Ana',
+    }
+    const h = makeHarness({ nodes: [user(1, 'hi')], queue: [pending] })
+    const view = render(<h.ChatView {...h.props} />)
+
+    // Readable while it waits: the collapsed row carries the account, so an
+    // operator sees the message without expanding and without a turn running.
+    const row = view.getByText('Ana: oi').closest('[data-pending-context]')
+    expect(row).not.toBeNull()
+    expect(within(row as HTMLElement).getByText('whatsapp-workspace')).not.toBeNull()
+    expect(view.getByText('hi').compareDocumentPosition(view.getByText('Ana: oi'))
+      & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+
+    // Claimed by the next request: the same row, now durable, and no duplicate.
+    act(() => {
+      h.set({
+        queue: [],
+        nodes: [
+          user(1, 'hi'),
+          {
+            kind: 'context', seq: 2, time: 2_000,
+            content: pending.content, source,
+            provenance: { role: 'inject', label: 'whatsapp-workspace' },
+            form: 'notice',
+          },
+        ],
+      })
+    })
+    expect(view.getAllByText('Ana: oi')).toHaveLength(1)
+    expect(view.container.querySelector('[data-pending-context]')).toBeNull()
+  })
+
   it('keeps a later pending occurrence visible when it reuses a durable MessageId', () => {
     const pending = {
       id: 'steer-occurrence-later' as never,
       messageId: 'shared-steer-message' as never,
       placement: 'steering' as const,
       content: [{ type: 'text' as const, text: 'same steering' }],
+      source: { kind: 'user' },
       preview: 'same steering',
       text: 'same steering',
     }
@@ -943,6 +990,7 @@ describe('ChatView', () => {
         messageId: 'steering-message' as never,
         placement: 'steering',
         content: [{ type: 'text', text: 'also' }],
+        source: { kind: 'user' },
         preview: 'also',
         text: 'also',
       }] })

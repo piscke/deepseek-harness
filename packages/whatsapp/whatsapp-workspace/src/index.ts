@@ -17,10 +17,11 @@ import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-sett
 import type {} from '@deepseek-ai/dsh-whatsapp'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { WhatsAppInboundRouter } from './router.ts'
-import type { WhatsAppChatScope } from './types.ts'
+import type { WhatsAppChatScope, WhatsAppInboundDelivery } from './types.ts'
 
 export type {
   WhatsAppChatScope,
+  WhatsAppInboundDelivery,
   WhatsAppInboundEvent,
   WhatsAppRouteTarget,
 } from './types.ts'
@@ -36,6 +37,7 @@ export {
   isRoutedKind,
   renderInbound,
   routeMessage,
+  summarizeInbound,
 } from './routing.ts'
 
 /** Cordis function-plugin name. */
@@ -63,6 +65,9 @@ export const WHATSAPP_WORKSPACE_SETTINGS_NAMESPACE = settingsNamespace('whatsapp
 /** Which conversations open a session, as a schema field shared by the entry and the user layer. */
 const ChatScope = z.union([z.const('all'), z.const('groups'), z.const('contacts')])
 
+/** How a delivered message reaches the model, as a schema field shared by the entry and the user layer. */
+const InboundDelivery = z.union([z.const('context'), z.const('turn')])
+
 /**
  * Deployment policy for the WhatsApp Workspace. Every field is a validated
  * `Config` member rather than a constant: the directory, the display title, the
@@ -80,6 +85,11 @@ export interface Config {
   allowChatIds?: string[]
   /** Chat ids never routed. Applied after `allowChatIds`, so a denied id stays denied. */
   denyChatIds?: string[]
+  /**
+   * How a delivered message reaches the model: as pending context the
+   * operator's next prompt carries, or as its own follow-up turn.
+   */
+  inboundDelivery?: WhatsAppInboundDelivery
   /**
    * Agent preset mounted on each conversation session as it is created. Absent
    * composes nothing, which leaves the session with whatever the composition
@@ -104,6 +114,7 @@ export const Config: z<Config> = z.object({
   chats: ChatScope.default('all'),
   allowChatIds: z.array(z.string()).default([]),
   denyChatIds: z.array(z.string()).default([]),
+  inboundDelivery: InboundDelivery.default('context'),
   agentPreset: z.string(),
   seenMessageLimit: z.number().default(1000),
 })
@@ -120,6 +131,8 @@ export interface WhatsAppWorkspaceSettings {
   allowChatIds?: string[]
   /** Chat ids never routed, applied after `allowChatIds`. */
   denyChatIds?: string[]
+  /** How a delivered message reaches the model; takes effect on the next observed message. */
+  inboundDelivery?: WhatsAppInboundDelivery
   /** Agent preset mounted on conversation sessions opened after the change. */
   agentPreset?: string
 }
@@ -129,6 +142,7 @@ export const WhatsAppWorkspaceSettings: z<WhatsAppWorkspaceSettings> = z.object(
   chats: ChatScope,
   allowChatIds: z.array(z.string()),
   denyChatIds: z.array(z.string()),
+  inboundDelivery: InboundDelivery,
   agentPreset: z.string(),
 })
 
@@ -143,6 +157,7 @@ export function settingsBase(config: ResolvedConfig): WhatsAppWorkspaceSettings 
     chats: config.chats,
     allowChatIds: config.allowChatIds,
     denyChatIds: config.denyChatIds,
+    inboundDelivery: config.inboundDelivery,
     ...config.agentPreset === undefined ? {} : { agentPreset: config.agentPreset },
   }
 }
@@ -161,6 +176,7 @@ export function applySettings(config: ResolvedConfig, settings: WhatsAppWorkspac
     ...settings.chats === undefined ? {} : { chats: settings.chats },
     ...settings.allowChatIds === undefined ? {} : { allowChatIds: settings.allowChatIds },
     ...settings.denyChatIds === undefined ? {} : { denyChatIds: settings.denyChatIds },
+    ...settings.inboundDelivery === undefined ? {} : { inboundDelivery: settings.inboundDelivery },
     ...settings.agentPreset === undefined ? {} : { agentPreset: settings.agentPreset },
   }
 }
