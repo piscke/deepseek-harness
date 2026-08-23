@@ -687,6 +687,45 @@ describe('boot', () => {
     }
   })
 
+  it('exposes configModulePath to Loader config expressions, resolving from the config directory', async () => {
+    // A profile's own dependencies live beside its config, where a plugin's
+    // own `import()` never looks; both arms matter, because an absent optional
+    // library must reach the plugin as `undefined` rather than as a boot
+    // failure.
+    const dir = tmp()
+    mkdirSync(join(dir, 'node_modules', 'pretend-lib'), { recursive: true })
+    writeFileSync(join(dir, 'package.json'), '{"name":"profile-fixture","version":"0.0.0"}\n')
+    writeFileSync(
+      join(dir, 'node_modules', 'pretend-lib', 'package.json'),
+      '{"name":"pretend-lib","version":"0.0.0","main":"index.js"}\n',
+    )
+    writeFileSync(join(dir, 'node_modules', 'pretend-lib', 'index.js'), 'export default {}\n')
+    writeFileSync(join(dir, 'capture.mjs'), [
+      'export const name = "capture"',
+      'export function apply(ctx, config) {',
+      '  ctx.provide("capturedFound", config.found)',
+      '  ctx.provide("capturedMissing", config.missing ?? "absent")',
+      '}',
+      '',
+    ].join('\n'))
+    writeFileSync(join(dir, 'cordis.yml'), [
+      '- id: capture',
+      '  name: ./capture.mjs',
+      '  config:',
+      "    found: !!js configModulePath('pretend-lib')",
+      "    missing: !!js configModulePath('never-installed-lib')",
+      '',
+    ].join('\n'))
+    let ctx: Context | undefined
+    try {
+      ctx = await boot(NAME, join(dir, 'cordis.yml'))
+      expect(ctx.get('capturedFound')).toBe(pathToFileURL(join(dir, 'node_modules', 'pretend-lib', 'index.js')).href)
+      expect(ctx.get('capturedMissing')).toBe('absent')
+    } finally {
+      await ctx?.fiber.dispose()
+    }
+  })
+
   it('returns instead of asserting over a tree a surface disposed mid-startup', async () => {
     // A surface can dispose the root fiber while boot() is still awaiting the
     // Loader, before the last entry settles. The Loader service goes with the

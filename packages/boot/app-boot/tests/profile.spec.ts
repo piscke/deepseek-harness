@@ -64,6 +64,10 @@ describe('initProfile', () => {
     expect(manifest.dsh?.profile?.bundles).toEqual(['@deepseek-ai/dsh-base'])
     expect(readFileSync(join(dir, PROFILE_PATCH_FILENAME), 'utf8')).toContain('[]')
     expect(readFileSync(join(dir, 'pnpm-workspace.yaml'), 'utf8')).toContain('nodeLinker: hoisted')
+    // A denied install script must not fail the install: `dsh plugin` only
+    // reconciles the bundle list when pnpm exits 0, so pnpm's default refusal
+    // would leave an installed library unusable.
+    expect(readFileSync(join(dir, 'pnpm-workspace.yaml'), 'utf8')).toContain('strictDepBuilds: false')
     // Re-init keeps user edits.
     writeFileSync(join(dir, PROFILE_PATCH_FILENAME), '- id: x\n  config: {}\n')
     initProfile(dir, ['other'])
@@ -159,6 +163,22 @@ describe('loadProfile', () => {
     }
     expect(readProfileManifest('t', resolveProfileDir('web', home)).dsh?.profile?.bundles)
       .toEqual([...PROFILE_TEMPLATES.web ?? []])
+  })
+
+  it('layers the whatsapp template over the web template and auto-initializes it', () => {
+    const anchor = stageInstallation({})
+    const home = tmp()
+    // The assistant is the web surface plus one bundle, so a divergence here
+    // would silently boot a WhatsApp profile without the surface it needs.
+    expect(PROFILE_TEMPLATES.whatsapp)
+      .toEqual([...PROFILE_TEMPLATES.web ?? [], '@deepseek-ai/dsh-whatsapp-app'])
+    try {
+      loadProfile('t', 'whatsapp', anchor, home)
+    } catch {
+      // Resolution failure is the plain-Node outcome for this empty anchor.
+    }
+    expect(readProfileManifest('t', resolveProfileDir('whatsapp', home)).dsh?.profile?.bundles)
+      .toEqual([...PROFILE_TEMPLATES.whatsapp ?? []])
   })
 
   it('normalizes only the exact installation-owned headless bundle tuple', () => {

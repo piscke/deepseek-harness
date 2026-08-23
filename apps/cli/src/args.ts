@@ -10,8 +10,9 @@
  * `dsh --profile tui --resume abc` boots the tui profile with `--resume abc`,
  * and `dsh --profile web -h` prints the web app's help, not this one's.
  *
- * `web` is a hardcoded alias for `--profile web`; `plugin` manages a profile's
- * plugin dependencies by forwarding to pnpm.
+ * `web` is a hardcoded alias for `--profile web`, `whatsapp` for `--profile
+ * whatsapp`; `plugin` manages a profile's plugin dependencies by forwarding to
+ * pnpm.
  * @module @deepseek-ai/dsh/args
  */
 
@@ -64,6 +65,7 @@ const collect = (value: string, previous: string[] = []): string[] => [...previo
 const HELP_EXAMPLES = `
 Examples:
   dsh --profile web                          boot the web profile (same as: dsh web)
+  dsh whatsapp                               boot the web profile with the WhatsApp assistant
   dsh --profile headless "run the tests"     answer one task, print the result, and exit
   dsh --profile tui --patch ./extra.yml      boot a custom profile with one extra overlay
   dsh --profile tui --resume <session>       arguments after the launcher flags reach the app
@@ -153,20 +155,36 @@ export function parseDshArgs(argv: readonly string[], version: string): DshInvoc
     }
   }
 
-  const web = program.command('web').description('boot the web profile (alias of --profile web); the web app\'s own flags follow')
-  web
-    .helpOption(false)
-    .allowUnknownOption()
-    .passThroughOptions()
-    .enablePositionalOptions()
-    .argument('[args...]', 'arguments for the web app (see: dsh web --help)')
-    .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
-    .option('--dump-config', 'print the composed web-profile tree (with the user layer and any --patch) and exit')
-    .option('--dump-default-config', 'print the web profile\'s bundle layers (no user layer) and exit')
-    .action((args: string[], options: BootOptions) => {
-      rejectParentOptions('web')
-      resolved = resolveBoot(web, 'web', options, args)
-    })
+  /**
+   * Register one hardcoded profile alias: the launcher's own boot flags,
+   * then every remaining token verbatim to the booted app.
+   * @param profile - the profile this alias boots, which is also its command name.
+   * @param summary - what the profile composes, for the alias description.
+   */
+  const addProfileAlias = (profile: string, summary: string): void => {
+    const alias = program.command(profile)
+      .description(`boot ${summary} (alias of --profile ${profile}); the app's own flags follow`)
+    alias
+      .helpOption(false)
+      .allowUnknownOption()
+      .passThroughOptions()
+      .enablePositionalOptions()
+      .argument('[args...]', `arguments for the app (see: dsh ${profile} --help)`)
+      .option('--patch <path>', 'extra patch-list overlay applied after the profile layer (repeatable)', collect)
+      .option('--dump-config', `print the composed ${profile}-profile tree (with the user layer and any --patch) and exit`)
+      .option('--dump-default-config', `print the ${profile} profile's bundle layers (no user layer) and exit`)
+      .action((args: string[], options: BootOptions) => {
+        rejectParentOptions(profile)
+        resolved = resolveBoot(alias, profile, options, args)
+      })
+  }
+
+  addProfileAlias('web', 'the web profile')
+  // The WhatsApp assistant is the web surface plus one more bundle layer, so it
+  // is a profile of its own rather than a flag: the account's credentials,
+  // routed conversations, and linked-device slot all follow DSH_HOME, and one
+  // connection per account means one such process per home.
+  addProfileAlias('whatsapp', 'the web profile with the WhatsApp assistant')
 
   const plugin = program.command('plugin').description('manage a profile\'s plugins by forwarding the remaining arguments to pnpm in the profile directory')
   plugin

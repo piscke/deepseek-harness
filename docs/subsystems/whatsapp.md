@@ -6,6 +6,10 @@ The WhatsApp seam — a [capability seam](../glossary.md#capability-seam) over *
 
 Source: [`packages/whatsapp/whatsapp/src/types.ts`](../../packages/whatsapp/whatsapp/src/types.ts)
 
+## How a deployment composes it
+
+The seam is optional, so it ships as a composition rather than as a flag: [`@deepseek-ai/dsh-whatsapp-app`](../../packages/bundle/whatsapp-app/README.md) is the bundle layer that mounts all four packages plus the pairing page over the Web profile, the `whatsapp` profile is that layer, and `dsh whatsapp` boots it. The Baileys library stays out of every manifest here, so an operator installs it into that profile with `dsh plugin --profile whatsapp add baileys`, which the patch reaches through `configModulePath('baileys')`.
+
 ## One account, one connection
 
 A WhatsApp account is not a per-request credential: it is a long-lived authenticated connection that a human authorizes once by scanning a QR code, and that WhatsApp can revoke at any time. So `ctx.whatsapp` reports `status()` as part of the capability rather than as a call result, and the provider slot holds exactly one registration — a second one fails with `WHATSAPP_PROVIDER_ALREADY_REGISTERED` instead of choosing between accounts. Running two accounts means two isolated fibers.

@@ -1,0 +1,58 @@
+{
+  "name": "@deepseek-ai/dsh-whatsapp-app",
+  "description": "The dsh WhatsApp bundle: the capability seam, one Baileys connection, the Workspace router, the model-facing tools, and the Settings page that pairs the account",
+  "version": "0.1.0-rc.8",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "packages/bundle/whatsapp-app"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/invariant.js",
+    "cordis.patch.yml",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/dsh-client-ui-settings-whatsapp": "workspace:^",
+    "@deepseek-ai/dsh-tool-whatsapp": "workspace:^",
+    "@deepseek-ai/dsh-whatsapp": "workspace:^",
+    "@deepseek-ai/dsh-whatsapp-baileys": "workspace:^",
+    "@deepseek-ai/dsh-whatsapp-workspace": "workspace:^"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/cordis": "workspace:^"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis-plugin-include": "workspace:^",
+    "@deepseek-ai/dsh-app-boot": "workspace:^",
+    "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/cordis": "workspace:^"
+  }
+}

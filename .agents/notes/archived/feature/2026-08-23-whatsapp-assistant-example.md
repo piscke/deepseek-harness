@@ -1,6 +1,7 @@
 # Agent Note: A runnable WhatsApp assistant example
 
 Status: implemented
+Archived: 2026-08-25
 
 English | [中文](2026-08-23-whatsapp-assistant-example.zh.md)
 

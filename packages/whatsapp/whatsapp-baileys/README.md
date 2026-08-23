@@ -8,13 +8,15 @@ This is an **implementation** package: it registers a provider into `ctx.whatsap
 
 ## Baileys is not a dependency
 
-`baileys` appears in no field of this package's manifest, and installing this package installs nothing from it. Baileys reaches `libsignal`, which is GPL-3.0 and resolves from a git repository; this repository is MIT and its pnpm policy rejects a git-resolved transitive dependency outright (`ERR_PNPM_EXOTIC_SUBDEP`), including through an optional peer, because peers are still resolved at install time.
+`baileys` appears in no field of this package's manifest, and installing this package installs nothing from it. Baileys reaches `libsignal`, which is GPL-3.0 while this repository is MIT; in the `6.x` line it also resolves from a git repository, which this repository's pnpm policy rejects outright (`ERR_PNPM_EXOTIC_SUBDEP`), including through an optional peer, because peers are still resolved at install time.
 
 A deployment installs Baileys itself and names it through `moduleSpecifier`; this package loads it with a dynamic `import()` the first time it connects. That install is where Baileys' license and its account-ban risk are accepted.
 
 ```sh
-pnpm add baileys   # in the deployment, not in this repository
+dsh plugin --profile whatsapp add baileys   # in the deployment's profile, not in this repository
 ```
+
+The `7.x` line resolves `libsignal` from the registry and installs under pnpm's default `blockExoticSubdeps`; the `6.x` line does not, and needs that block lifted in the installing project.
 
 Without it, connecting fails with `WHATSAPP_BAILEYS_MISSING`, the provider marks itself terminal, and no reconnection is attempted — no retry can install a package. `ctx.whatsapp` then reports `offline` and every operation fails with `WHATSAPP_PROVIDER_UNAVAILABLE`.
 

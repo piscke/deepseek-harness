@@ -114,6 +114,7 @@ export function resolveProfileDir(name: string, home: string = resolveDshHome())
 export const PROFILE_TEMPLATES: Record<string, readonly string[]> = {
   web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
   headless: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'],
+  whatsapp: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@deepseek-ai/dsh-whatsapp-app'],
 }
 
 /** Installation-owned bundle tuples normalized to the shipped template. */
@@ -135,11 +136,18 @@ const PROFILE_PATCH_TEMPLATE = `# Your patch layer for this dsh profile, applied
 // profiles/node_modules installation fallback, so every plugin shares the
 // installation's single cordis instance instead of a duplicate. pnpm ≥10
 // reads its settings from pnpm-workspace.yaml, not .npmrc.
+//
+// A profile denies third-party install scripts: none is listed under
+// allowBuilds, and strictDepBuilds turns pnpm's refusal to run one back into a
+// warning so installing a library that merely ships a script still succeeds.
+// A plugin that genuinely needs its build opts in per package through
+// `dsh plugin --profile <name> approve-builds`.
 const PROFILE_PNPM_WORKSPACE = `packages:
   - .
 
 nodeLinker: hoisted
 autoInstallPeers: false
+strictDepBuilds: false
 `
 
 /**

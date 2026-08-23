@@ -8,13 +8,15 @@
 
 ## Baileys 不是依赖
 
-`baileys` 不出现在本包清单的任何字段中，安装本包也不会带来它的任何内容。Baileys 会传递依赖到 `libsignal`，后者采用 GPL-3.0 并从 git 仓库解析；本仓库是 MIT，其 pnpm 策略直接拒绝 git 解析的传递依赖（`ERR_PNPM_EXOTIC_SUBDEP`），通过可选 peer 也一样，因为 peer 仍会在安装时解析。
+`baileys` 不出现在本包清单的任何字段中，安装本包也不会带来它的任何内容。Baileys 会传递依赖到 `libsignal`，后者采用 GPL-3.0，而本仓库是 MIT；在 `6.x` 线上它还从 git 仓库解析，本仓库的 pnpm 策略直接拒绝这种传递依赖（`ERR_PNPM_EXOTIC_SUBDEP`），通过可选 peer 也一样，因为 peer 仍会在安装时解析。
 
 部署方自行安装 Baileys 并通过 `moduleSpecifier` 指明它；本包在首次连接时用动态 `import()` 加载它。接受 Baileys 许可证与账号封禁风险的位置，就是那次安装。
 
 ```sh
-pnpm add baileys   # in the deployment, not in this repository
+dsh plugin --profile whatsapp add baileys   # in the deployment's profile, not in this repository
 ```
+
+`7.x` 线从 registry 解析 `libsignal`，在 pnpm 默认的 `blockExoticSubdeps` 下即可安装；`6.x` 线不行，需要在安装它的项目中解除该阻断。
 
 缺少它时，连接失败于 `WHATSAPP_BAILEYS_MISSING`，provider 将自身标记为终止，并且不再尝试重连 —— 没有任何重试能安装一个包。此时 `ctx.whatsapp` 上报 `offline`，每个操作都失败于 `WHATSAPP_PROVIDER_UNAVAILABLE`。
 

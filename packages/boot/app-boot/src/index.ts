@@ -1,15 +1,16 @@
 /**
  * Shared boot glue for the app bins (`dsh`, `dsh-acp-demo`): load the gitignored
  * `.env`, install the fail-loud Loader guards, resolve the config path (snapshot-aware), load the
- * optional user patch layers from the Harness home (`~/.dsh`), expose its path resolver to
- * config expressions, and drive the Cordis Loader against a leaf `cordis.yml` until the tree settles.
+ * optional user patch layers from the Harness home (`~/.dsh`), expose its path resolver and the
+ * config-directory library resolver to config expressions, and drive the Cordis Loader against a leaf `cordis.yml` until the tree settles.
  * @module @deepseek-ai/dsh-app-boot
  */
 
 import { pathToFileURL } from 'node:url'
+import { createRequire } from 'node:module'
 import { readFileSync } from 'node:fs'
 import { parseEnv } from 'node:util'
-import { basename, dirname, isAbsolute, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import * as yaml from 'js-yaml'
 import { Context, type FiberState } from '@deepseek-ai/cordis'
 import Loader, { type Entry, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
@@ -25,6 +26,8 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     /** Harness-home path resolver available to Loader `!!js` config expressions. */
     dshHomePath?: typeof dshHomePath
+    /** Resolver for libraries installed beside the booted config, available to Loader `!!js` config expressions. */
+    configModulePath?: (specifier: string) => string | undefined
   }
 }
 
@@ -725,6 +728,32 @@ export async function assertEntriesActivated(ctx: Context, binName: string): Pro
 }
 
 /**
+ * Resolve a library installed beside the booted config into an importable
+ * `file:` URL.
+ *
+ * A plugin package reaches an operator-installed library through a dynamic
+ * `import()`, which resolves from that plugin's own location inside the dsh
+ * installation and therefore never sees the configuration project's
+ * `node_modules`. Profile dependencies (`dsh plugin --profile <name> add
+ * <package>`) live in the profile directory, which is where the booted root
+ * config sits, so resolving from there is what makes such an install reachable.
+ * The result is a URL rather than a filesystem path because a Windows path is
+ * not a valid `import()` specifier.
+ * @param configDir - directory of the booted root config; the resolution anchor.
+ * @param specifier - the library's package name.
+ * @returns the importable `file:` URL, or `undefined` when the anchor cannot resolve the name.
+ */
+export function configModulePath(configDir: string, specifier: string): string | undefined {
+  try {
+    return pathToFileURL(createRequire(join(configDir, 'package.json')).resolve(specifier)).href
+  } catch {
+    // Not installed beside the config. The caller decides what an absent
+    // optional library means; no other failure mode reaches this resolve.
+    return undefined
+  }
+}
+
+/**
  * Boot the Loader against `absoluteConfigPath` and return only after the whole
  * tree settles. Relative entry names resolve against the config directory;
  * bare package names resolve there by default or against an explicit
@@ -768,6 +797,7 @@ export async function boot(
   try {
     ctx.baseUrl = pathToFileURL(dirname(absoluteConfigPath)).href + '/'
     ctx.provide('dshHomePath', dshHomePath)
+    ctx.provide('configModulePath', (specifier: string) => configModulePath(dirname(absoluteConfigPath), specifier))
     await ctx.plugin(Loader)
     await prepare?.(ctx)
     stage = 'plugin tree failed to load'

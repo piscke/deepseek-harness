@@ -1,10 +1,9 @@
 // @vitest-environment jsdom
-// The pairing surface as an operator meets it: `dsh web --patch
-// examples/whatsapp-assistant/cordis.yml`, Settings, WhatsApp. Only the
-// assembled graph proves the opt-in row reaches the boot manifest at all, that
-// the section nav projects it, and that the QR reaches the panel from the
-// loopback channel — the package bench mounts the component directly and can
-// prove none of that.
+// The pairing surface as an operator meets it: `dsh whatsapp`, Settings,
+// WhatsApp. Only the assembled graph proves the bundle's row reaches the boot
+// manifest at all, that the section nav projects it, and that the QR reaches
+// the panel from the loopback channel — the package bench mounts the component
+// directly and can prove none of that.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'

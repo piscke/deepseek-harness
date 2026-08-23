@@ -16,7 +16,7 @@ Host 半边 inject `connection` 与 `whatsapp`，以 `authority: 'loopback'` 注
 
 命名空间的名字在此处直接写出而非 import，因为 client 包不得依赖 Host 包；有一个测试把该常量与工作区自己的导出对齐。
 
-组合本包本身就创建了该页面，因此它的存在即是能力检查：没有 WhatsApp 的 harness 不会显示 WhatsApp 页面，而不是显示一个空页面。[`examples/whatsapp-assistant`](../../../examples/whatsapp-assistant/README.md) 负责插入这一行。
+组合本包本身就创建了该页面，因此它的存在即是能力检查：没有 WhatsApp 的 harness 不会显示 WhatsApp 页面，而不是显示一个空页面。[`@deepseek-ai/dsh-whatsapp-app`](../../bundle/whatsapp-app/README.md) 负责插入这一行。
 
 ## 模型体验
 

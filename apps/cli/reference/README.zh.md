@@ -8,9 +8,9 @@
 
 `dsh --profile <name>` 启动位于 `$DSH_HOME/profiles/<name>` 的 profile。生效配置树以空根节点为起点，依次叠加 profile manifest（元数据清单）的 `dsh.profile.bundles` 列表中指定的各组合包 patch、profile 自身的 `cordis.patch.yml`、home 级的 `$DSH_HOME/cordis.patch.yml`（这是各 profile 共享的机器本地偏好，因此优先于逐 profile 配置层），以及按 argv 顺序指定的各个 `--patch <path>` 覆盖层。对同一配置行，后应用的层优先。patch 会替换目标行的整个 `config` 值，而不是深度合并其中的键；patch 也可以插入新行。配置解析、schema 校验、模块解析或插件启动失败时，系统会报告错误并以非零状态退出。收到 SIGINT 或 SIGTERM 时，挂载的根节点会先 dispose（资源释放）再退出。
 
-组合包名称先从 dsh 安装目录解析，再从 profile 目录解析。因此，内置组合包（`@deepseek-ai/dsh-base`、`@deepseek-ai/dsh-web-app`、`@deepseek-ai/dsh-headless`）始终来自当前运行的 `dsh` 所属的安装；树外组合包则来自 profile 中由 pnpm 管理的 `node_modules`。patch 行中的裸插件 `name` 会从 profile 目录开始，按照 Node 的模块解析规则逐级向父目录查找，直至由 dsh 维护的安装后备目录 `$DSH_HOME/profiles/node_modules`。该目录为 dsh 安装中的应用和组合包所依赖的每个包各维护一个符号链接，并在每次启动时修复这些链接。
+组合包名称先从 dsh 安装目录解析，再从 profile 目录解析。因此，内置组合包（`@deepseek-ai/dsh-base`、`@deepseek-ai/dsh-web-app`、`@deepseek-ai/dsh-headless`、`@deepseek-ai/dsh-whatsapp-app`）始终来自当前运行的 `dsh` 所属的安装；树外组合包则来自 profile 中由 pnpm 管理的 `node_modules`。patch 行中的裸插件 `name` 会从 profile 目录开始，按照 Node 的模块解析规则逐级向父目录查找，直至由 dsh 维护的安装后备目录 `$DSH_HOME/profiles/node_modules`。该目录为 dsh 安装中的应用和组合包所依赖的每个包各维护一个符号链接，并在每次启动时修复这些链接。
 
-`web` 和 `headless` profile 首次使用时会从随附模板自动初始化（`web`：base + web-app；`headless`：base + headless）。其他缺失的 profile 会显式报错，并提示运行 `dsh plugin --profile <name> add <package>`。
+`web`、`headless` 和 `whatsapp` profile 首次使用时会从随附模板自动初始化（`web`：base + web-app；`headless`：base + headless；`whatsapp`：base + web-app + whatsapp-app）。其他缺失的 profile 会显式报错，并提示运行 `dsh plugin --profile <name> add <package>`。
 
 ### 应用参数
 
@@ -83,6 +83,17 @@ dsh web --help
 新会话默认使用 `workspace-write` 权限预设。Bash 和文件系统修改仅限于会话 workspace 与平台临时根目录；读取、网络访问和进程可见性不受限制。`DSH_PERMISSION_MODE` 更改进程后备值。General settings 中存储的权限影响后续 Web 会话，不改变已打开的会话。
 
 `DSH_TOOLS_MODE` 为进程选择 `native`、`code` 或 `both`；其他值会导致启动失败。随附的 `minimal` agent preset 会保留该部署的呈现方式，将完整系统提示词固定为 `You are a helpful software engineer assistant.`，并且仅组合持久 `bash` 和 `str_replace_editor`。创建 Web 会话时请选择极简模式；该 agent 不包含任何其他提示词段落或面向模型的插件，而共享的浏览器、workspace、持久化、沙箱与权限宿主保持不变。
+
+## WhatsApp 别名
+
+`dsh whatsapp` 是 `--profile whatsapp` 的硬编码别名：同一个 web 应用之上叠加 [WhatsApp 助手](../../../packages/bundle/whatsapp-app/README.md)组合包，因此上面所有 web flag 原样适用。Baileys 库不随发行版提供，必须先安装进该 profile 一次；随后该组合会从那里解析它。
+
+```sh
+dsh plugin --profile whatsapp add baileys
+dsh whatsapp
+```
+
+请在该机器的浏览器中通过**设置 › WhatsApp** 配对账号 —— 该页面只应答回环访问，因为二维码链接的设备拥有账号的完全访问权限。WhatsApp 会替换既有的已链接设备，因此每个 `DSH_HOME` 只运行一个 WhatsApp harness，第二个账号请使用第二个 home。缺少该库时，provider 上报 `WHATSAPP_BAILEYS_MISSING` 并保持停止，而应用的其余部分照常运行。
 
 ## 共享部署行为
 

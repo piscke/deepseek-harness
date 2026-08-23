@@ -27,7 +27,3 @@ An opt-in Web overlay for durable, Session-local reminders. It supports positive
 ## acp-agent
 
 An Agent Client Protocol automation server for programmatic clients, with session, permission, and cancellation support. See the [ACP example reference](acp-agent/README.md).
-
-## whatsapp-assistant
-
-An opt-in Web overlay that links a WhatsApp account, routes incoming messages into `Groups` and `Contacts` Sessions, and has the Agent draft replies the operator approves before they are sent. The Baileys library is installed by the operator outside this repository and named through an environment variable. Run `dsh web --patch examples/whatsapp-assistant/cordis.yml`; see [whatsapp-assistant/README.md](whatsapp-assistant/README.md) for that install, pairing, the one-connection-per-account rule, and the observation-scoped limits of the chat index.

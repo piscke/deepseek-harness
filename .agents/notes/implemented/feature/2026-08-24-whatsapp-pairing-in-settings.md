@@ -12,7 +12,7 @@ The reason it had no home is not layout. A `pairing` payload is a credential: wh
 
 ## Decision
 
-[`@deepseek-ai/dsh-client-ui-settings-whatsapp`](../../../../packages/client/ui-settings-whatsapp/README.md) contributes a **WhatsApp** page to Web Settings (`settings.section`, id `whatsapp`, order 25) that renders the connection state and, while the account is pairing, the live code. [`examples/whatsapp-assistant`](../../../../examples/whatsapp-assistant/README.md) inserts its row, so the page exists exactly where WhatsApp was composed; presence of the page is the capability check, and no plugin-inventory probe is needed to decide whether to draw it.
+[`@deepseek-ai/dsh-client-ui-settings-whatsapp`](../../../../packages/client/ui-settings-whatsapp/README.md) contributes a **WhatsApp** page to Web Settings (`settings.section`, id `whatsapp`, order 25) that renders the connection state and, while the account is pairing, the live code. [`@deepseek-ai/dsh-whatsapp-app`](../../../../packages/bundle/whatsapp-app/README.md) inserts its row, so the page exists exactly where WhatsApp was composed; presence of the page is the capability check, and no plugin-inventory probe is needed to decide whether to draw it.
 
 The package registers its own Connection RPC channel rather than joining a shared plane:
 
@@ -44,7 +44,7 @@ The page polls `status` every two seconds while it is open, and not at all while
 
 Package tests cover both halves per-file: the Host half's endpoint dispatch and its `bad-request` for anything else, and the browser half's registration (inject list, id, order, localized label, locale switch, late slot declaration, teardown), the reader's success/error/undecodable paths, every status arm of the page, the poll cadence, cancellation on unmount, and the retry after a failed read.
 
-`packages/client/connection`'s fixture transport now serves `/whatsapp`, selected by `?fixtureWhatsApp=pairing|online|offline|connecting|logged-out`, so the assembled Web harness can drive each arm without an account. `apps/cli/tests/whatsapp-assistant-config.spec.ts` pins the overlay's fifth row.
+`packages/client/connection`'s fixture transport now serves `/whatsapp`, selected by `?fixtureWhatsApp=pairing|online|offline|connecting|logged-out`, so the assembled Web harness can drive each arm without an account. `packages/bundle/whatsapp-app/tests/whatsapp-app.spec.ts` pins the patch's fifth row.
 
 `apps/web/tests/whatsapp-settings.snapshot.ts` boots the built browser graph with the overlay applied, opens Settings, selects WhatsApp, and pins the pairing card with its rendered `<svg>` code and credential warning, the connected account, and the absence of any WhatsApp page when the overlay is not applied. Reaching that required the jsdom boot harness (`apps/web/tests/assembled-boot.ts`) to compose the same `--patch` layers `dsh web` accepts instead of only the shipped bundles; without it no opt-in row can appear in an assembled transcript.
 

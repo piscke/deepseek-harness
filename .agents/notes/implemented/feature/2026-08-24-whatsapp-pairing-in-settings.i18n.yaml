@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-whatsapp-pairing-in-settings.md
-2026-08-24-whatsapp-pairing-in-settings.md: 8cc09d752df3bc7a4d4f22d0a2be30c9639be6cf
-2026-08-24-whatsapp-pairing-in-settings.zh.md: 811a1bd27864a7e44fb89688436e24f207a197db
+2026-08-24-whatsapp-pairing-in-settings.md: 1c2e5518571ece88e4a2279a47536633172971b4
+2026-08-24-whatsapp-pairing-in-settings.zh.md: 579e592065d6a20ce8a449720ee0f4bec14d9146

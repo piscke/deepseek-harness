@@ -159,9 +159,6 @@ importers:
       '@deepseek-ai/dsh-client-ui-cordis':
         specifier: workspace:^
         version: link:../../packages/extensions/ui-cordis
-      '@deepseek-ai/dsh-client-ui-settings-whatsapp':
-        specifier: workspace:^
-        version: link:../../packages/client/ui-settings-whatsapp
       '@deepseek-ai/dsh-cmdline':
         specifier: workspace:^
         version: link:../../packages/boot/cmdline
@@ -297,24 +294,15 @@ importers:
       '@deepseek-ai/dsh-tool-web':
         specifier: workspace:^
         version: link:../../packages/web/tool-web
-      '@deepseek-ai/dsh-tool-whatsapp':
-        specifier: workspace:^
-        version: link:../../packages/whatsapp/tool-whatsapp
       '@deepseek-ai/dsh-tool-workflow':
         specifier: workspace:^
         version: link:../../packages/workflow/tool-workflow
       '@deepseek-ai/dsh-web-app':
         specifier: workspace:^
         version: link:../../packages/bundle/web-app
-      '@deepseek-ai/dsh-whatsapp':
+      '@deepseek-ai/dsh-whatsapp-app':
         specifier: workspace:^
-        version: link:../../packages/whatsapp/whatsapp
-      '@deepseek-ai/dsh-whatsapp-baileys':
-        specifier: workspace:^
-        version: link:../../packages/whatsapp/whatsapp-baileys
-      '@deepseek-ai/dsh-whatsapp-workspace':
-        specifier: workspace:^
-        version: link:../../packages/whatsapp/whatsapp-workspace
+        version: link:../../packages/bundle/whatsapp-app
       '@deepseek-ai/dsh-workflow-worker-thread':
         specifier: workspace:^
         version: link:../../packages/workflow/workflow-worker-thread
@@ -1513,6 +1501,37 @@ importers:
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
+
+  packages/bundle/whatsapp-app:
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-settings-whatsapp':
+        specifier: workspace:^
+        version: link:../../client/ui-settings-whatsapp
+      '@deepseek-ai/dsh-tool-whatsapp':
+        specifier: workspace:^
+        version: link:../../whatsapp/tool-whatsapp
+      '@deepseek-ai/dsh-whatsapp':
+        specifier: workspace:^
+        version: link:../../whatsapp/whatsapp
+      '@deepseek-ai/dsh-whatsapp-baileys':
+        specifier: workspace:^
+        version: link:../../whatsapp/whatsapp-baileys
+      '@deepseek-ai/dsh-whatsapp-workspace':
+        specifier: workspace:^
+        version: link:../../whatsapp/whatsapp-workspace
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/cordis-plugin-include':
+        specifier: workspace:^
+        version: link:../../../vendor/include
+      '@deepseek-ai/dsh-app-boot':
+        specifier: workspace:^
+        version: link:../../boot/app-boot
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
 
   packages/client/connection:
     dependencies:
