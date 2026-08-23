@@ -47,7 +47,9 @@ export class WhatsAppInboundRouter {
   /**
    * Route one observed message. Filtered conversations, the account's own
    * messages, and ids already delivered end here; everything else is queued
-   * against its conversation's session, opening that session on first use.
+   * against its conversation's session, opening that session on first use. A
+   * conversation the operator archived is restored to the sidebar as its
+   * message is routed.
    *
    * A message that arrives while this router is being disposed is dropped by
    * the target queue, which stops accepting before its drain is awaited.
@@ -58,6 +60,7 @@ export class WhatsAppInboundRouter {
     const sessionId = routeMessage(config, message)
     if (sessionId === undefined) return
     if (!this.seen.admit(message.id)) return
+    this.restore(sessionId)
     void this.open(sessionId, message, config).then(
       (session) => { session.inbox.enqueue(message, config.inboundDelivery) },
       (error: unknown) => {
@@ -99,6 +102,27 @@ export class WhatsAppInboundRouter {
       // delivered into belongs to whoever published it.
       await session.opened.handle?.dispose()
     }))
+  }
+
+  /**
+   * Return one conversation to the grouping surfaces before its message is
+   * delivered. An archived conversation that speaks again is active again: the
+   * agent answers it whether or not its row is visible, so leaving it hidden
+   * would hide a live exchange from the operator, with no surface to find it
+   * through. A conversation that is not archived reads the set synchronously
+   * and writes nothing, so this costs a lookup per message.
+   *
+   * The durable write is not awaited: the row reappearing is display state, and
+   * making delivery wait on it would delay the model for a sidebar update.
+   */
+  private restore(sessionId: SessionId): void {
+    const registry = this.ctx.workspaceRegistry
+    if (!registry.archivedSessionIds.includes(sessionId)) return
+    void registry.unarchiveSession(sessionId).catch((error: unknown) => {
+      this.ctx.logger.warn(
+        `whatsapp-workspace: could not unarchive session "${sessionId}": ` + renderThrown(error),
+      )
+    })
   }
 
   /** Open one session once; a failed open is forgotten so a later message retries it. */
