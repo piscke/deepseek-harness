@@ -142,6 +142,33 @@ Source: [`packages/whatsapp/whatsapp/src/index.ts:62`](../../packages/whatsapp/w
 
 ### `whatsapp/*` events
 
+<a id="whatsappchat-named--emit"></a>
+
+#### `whatsapp/chat-named` — emit
+
+A conversation's display name became known or changed. WhatsApp delivers a group's subject and a contact's name outside the message stream, so a conversation is routinely unnamed when its first message arrives and named moments later; a surface that pinned the address instead is expected to follow this event and correct itself.
+
+Emitted only when the name the provider holds actually changes, so a reconnection that re-syncs the same roster is silent.
+
+```ts cordis-catalog
+/**
+ * A conversation's display name became known or changed. WhatsApp delivers
+ * a group's subject and a contact's name outside the message stream, so a
+ * conversation is routinely unnamed when its first message arrives and
+ * named moments later; a surface that pinned the address instead is
+ * expected to follow this event and correct itself.
+ *
+ * Emitted only when the name the provider holds actually changes, so a
+ * reconnection that re-syncs the same roster is silent.
+ * @param chatId - the conversation that has a name.
+ * @param name - the display name, never empty.
+ * @mode emit
+ */
+'whatsapp/chat-named'(chatId: WhatsAppChatId, name: string): void
+```
+
+Source: [`packages/whatsapp/whatsapp/src/types.ts:195`](../../packages/whatsapp/whatsapp/src/types.ts)
+
 <a id="whatsappmessage-received--emit"></a>
 
 #### `whatsapp/message-received` — emit
@@ -161,7 +188,7 @@ One message was observed in a chat, including messages the connected account sen
 'whatsapp/message-received'(message: WhatsAppMessage): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:173`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:181`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappmessage-sent--emit"></a>
 
@@ -180,7 +207,7 @@ The provider acknowledged one send requested through `ctx.whatsapp`. Acknowledge
 'whatsapp/message-sent'(message: WhatsAppSentMessage): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:181`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:203`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappstatus--emit"></a>
 
@@ -199,5 +226,5 @@ The account's connection state changed, emitted once per transition. A `pairing`
 'whatsapp/status'(status: WhatsAppStatus): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:163`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:171`](../../packages/whatsapp/whatsapp/src/types.ts)
 <!-- END GENERATED cordis-surface -->

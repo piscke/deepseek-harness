@@ -18,8 +18,8 @@ function requireText(value: unknown, field: string, fail: InvariantFailure): voi
  * Validate one delivered inbound message's durable provenance.
  *
  * Deliberately silent on routing: which session a message landed in is the
- * deployment's `route` policy, and a log written under one route must still
- * replay after the deployment changes it.
+ * deployment's `chats` policy, and a log written while one conversation kind
+ * was answered must still replay after the deployment narrows it.
  */
 function validateInbound(data: Record<string, unknown>, fail: InvariantFailure): void {
   requireText(data.messageId, 'messageId', fail)

@@ -1,9 +1,9 @@
 /**
- * Vocabulary of the WhatsApp Workspace consumer: the routing mode, the
- * resolved routing target, and the durable provenance event one delivered
- * inbound message writes. Types and the session-event declaration only — the
- * runtime lives in the sibling modules, and the deployment policy lives with
- * its schema in `src/index.ts`.
+ * Vocabulary of the WhatsApp Workspace consumer: which conversations open a
+ * session, the resolved routing target, and the durable provenance event one
+ * delivered inbound message writes. Types and the session-event declaration
+ * only — the runtime lives in the sibling modules, and the deployment policy
+ * lives with its schema in `src/index.ts`.
  * @module @deepseek-ai/dsh-whatsapp-workspace/src/types
  */
 
@@ -11,17 +11,14 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { WhatsAppChatKind, WhatsAppContent } from '@deepseek-ai/dsh-whatsapp'
 
 /**
- * How inbound conversations map onto sessions. A CLOSED union: consumers
- * `switch` on it ending in `assertNever`, so a new mode breaks compilation.
+ * Which conversations open a session. A CLOSED union: consumers `switch` on it
+ * ending in `assertNever`, so a new scope breaks compilation.
  *
- * - `category` — two standing sessions, one for groups and one for direct
- *   chats. Every conversation of a kind shares an agent, so each delivered
- *   message must identify its chat.
- * - `per-chat` — one session per conversation, created the first time that
- *   conversation is routed.
- * - `single` — every conversation shares one session.
+ * - `all` — every conversation the account observes.
+ * - `groups` — group conversations only.
+ * - `contacts` — direct conversations only.
  */
-export type WhatsAppRouteMode = 'category' | 'per-chat' | 'single'
+export type WhatsAppChatScope = 'all' | 'groups' | 'contacts'
 
 /** The session one routed message belongs to, plus the title that session is pinned to. */
 export interface WhatsAppRouteTarget {

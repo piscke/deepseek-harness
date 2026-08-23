@@ -3212,56 +3212,54 @@ export interface Config {
 }
 ```
 
-来源：[`packages/whatsapp/whatsapp-baileys/src/index.ts:46`](../packages/whatsapp/whatsapp-baileys/src/index.ts)
+来源：[`packages/whatsapp/whatsapp-baileys/src/index.ts:48`](../packages/whatsapp/whatsapp-baileys/src/index.ts)
 
 <a id="deepseek-aidsh-whatsapp-workspace"></a>
 
 ## `@deepseek-ai/dsh-whatsapp-workspace`
 
-需要：`agents` · `sessionPersistence` · `sessions` · `sessionTitle` · `whatsapp` · `workspaceRegistry`
+需要：`agentDefaultModel` · `agents` · `sessionPersistence` · `sessions` · `sessionTitle` · `whatsapp` · `workspaceRegistry`
 
 ```ts config-catalog
 /**
  * Deployment policy for the WhatsApp Workspace. Every field is a validated
- * `Config` member rather than a constant: the directory, the display titles,
- * and the routing shape all vary per deployment and per language.
+ * `Config` member rather than a constant: the directory, the display title, the
+ * conversations that are answered, and the preset that answers them all vary
+ * per deployment.
  */
 export interface Config {
   /** Directory the Workspace owns. A leading `~` expands to the user's home; the resolved path must be absolute. */
   directory?: string
   /** Display title of the Workspace registration in the sidebar. */
   workspaceTitle?: string
-  /** How inbound conversations map onto sessions. Required: no routing shape is right for every deployment. */
-  route: WhatsAppRouteMode
-  /** Title pinned on the `category` route's group session. */
-  groupsTitle?: string
-  /** Title pinned on the `category` route's direct-chat session. */
-  contactsTitle?: string
-  /** Title pinned on the `single` route's one session. */
-  conversationsTitle?: string
+  /** Which conversations open a session. Every routed conversation gets its own. */
+  chats?: WhatsAppChatScope
   /** When non-empty, only these chat ids are routed; every other conversation is dropped. */
   allowChatIds?: string[]
   /** Chat ids never routed. Applied after `allowChatIds`, so a denied id stays denied. */
   denyChatIds?: string[]
+  /**
+   * Agent preset mounted on each conversation session as it is created. Absent
+   * composes nothing, which leaves the session with whatever the composition
+   * gives every agent.
+   */
+  agentPreset?: string
   /** How many recently delivered message ids are remembered to suppress a provider's history replay. */
   seenMessageLimit?: number
 }
 
 /**
- * How inbound conversations map onto sessions. A CLOSED union: consumers
- * `switch` on it ending in `assertNever`, so a new mode breaks compilation.
+ * Which conversations open a session. A CLOSED union: consumers `switch` on it
+ * ending in `assertNever`, so a new scope breaks compilation.
  *
- * - `category` — two standing sessions, one for groups and one for direct
- *   chats. Every conversation of a kind shares an agent, so each delivered
- *   message must identify its chat.
- * - `per-chat` — one session per conversation, created the first time that
- *   conversation is routed.
- * - `single` — every conversation shares one session.
+ * - `all` — every conversation the account observes.
+ * - `groups` — group conversations only.
+ * - `contacts` — direct conversations only.
  */
-export type WhatsAppRouteMode = 'category' | 'per-chat' | 'single'
+export type WhatsAppChatScope = 'all' | 'groups' | 'contacts'
 ```
 
-来源：[`packages/whatsapp/whatsapp-workspace/src/index.ts:58`](../packages/whatsapp/whatsapp-workspace/src/index.ts)
+来源：[`packages/whatsapp/whatsapp-workspace/src/index.ts:72`](../packages/whatsapp/whatsapp-workspace/src/index.ts)
 
 <a id="deepseek-aidsh-workflow-worker-thread"></a>
 

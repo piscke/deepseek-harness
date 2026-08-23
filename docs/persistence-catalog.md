@@ -1022,7 +1022,7 @@ Source: [`packages/web/web-search-deepseek/src/provider.ts:83`](../packages/web/
 'whatsapp/inbound': WhatsAppInboundEvent
 ```
 
-Source: [`packages/whatsapp/whatsapp-workspace/src/types.ts:62`](../packages/whatsapp/whatsapp-workspace/src/types.ts)
+Source: [`packages/whatsapp/whatsapp-workspace/src/types.ts:59`](../packages/whatsapp/whatsapp-workspace/src/types.ts)
 
 <a id="whatsappoutbound--log-only"></a>
 

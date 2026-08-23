@@ -13,6 +13,10 @@ interface Rig {
   readonly statuses: WhatsAppStatus[]
   readonly messages: WhatsAppMessage[]
   readonly fatals: unknown[]
+  /** Every `(chatId, name)` the provider announced, in order. */
+  readonly named: [string, string][]
+  /** Every group whose subject lookup the provider reported as failed. */
+  readonly nameFailures: string[]
   /** Push one observation into the provider, as a live socket would. */
   emit(event: SocketEvent): void
   /** Run the reconnection timer the provider is waiting on. */
@@ -20,7 +24,7 @@ interface Rig {
   readonly pendingTimers: number
   readonly cancelledTimers: number
   readonly opens: number
-  readonly socket: { sent: string[]; read: string[]; closed: boolean }
+  readonly socket: { sent: string[]; read: string[]; closed: boolean; subjectAsks: string[] }
 }
 
 /** Build a provider over a scripted socket, with the failure modes a test needs. */
@@ -29,12 +33,18 @@ function rig(options: {
   sendFails?: boolean
   maxReconnectAttempts?: number
   historyPerChat?: number
+  /** Subject the account answers a group lookup with; omitted means the group has none. */
+  groupSubject?: string
+  /** Make every group-subject lookup fail, as an offline or forbidden account would. */
+  subjectFails?: boolean
 } = {}): Rig {
   const statuses: WhatsAppStatus[] = []
   const messages: WhatsAppMessage[] = []
   const fatals: unknown[] = []
+  const named: [string, string][] = []
+  const nameFailures: string[] = []
   const timers: (() => void)[] = []
-  const socket = { sent: [] as string[], read: [] as string[], closed: false }
+  const socket = { sent: [] as string[], read: [] as string[], closed: false, subjectAsks: [] as string[] }
   let cancelledTimers = 0
   let opens = 0
   let emit: (event: SocketEvent) => void = () => {}
@@ -48,6 +58,11 @@ function rig(options: {
     markRead: (id) => {
       socket.read.push(id)
       return Promise.resolve()
+    },
+    fetchGroupSubject: (id) => {
+      socket.subjectAsks.push(id)
+      if (options.subjectFails === true) return Promise.reject(new WhatsAppError('not a participant', 'WHATSAPP_UNKNOWN_CHAT'))
+      return Promise.resolve(options.groupSubject)
     },
     close: () => {
       socket.closed = true
@@ -64,6 +79,8 @@ function rig(options: {
     },
     onStatus: status => statuses.push(status),
     onMessage: message => messages.push(message),
+    onChatNamed: (id, name) => named.push([id, name]),
+    onNameFailure: id => nameFailures.push(id),
     onFatal: error => fatals.push(error),
     setTimer: (callback) => {
       timers.push(callback)
@@ -83,6 +100,8 @@ function rig(options: {
     statuses,
     messages,
     fatals,
+    named,
+    nameFailures,
     socket,
     emit: (event) => { emit(event) },
     fireTimer: () => timers.shift()?.(),
@@ -355,9 +374,88 @@ describe('history', () => {
   it('refuses a value that names no conversation at all', async () => {
     const scripted = await online()
     for (const bogus of ['ana', '@s.whatsapp.net', '5511999990000@']) {
-      expect(() => scripted.provider.resolveChat(WhatsAppChatId(bogus))).toThrow(WhatsAppError)
-      expect(() => scripted.provider.resolveChat(WhatsAppChatId(bogus))).toThrow(/names no WhatsApp conversation/)
+      await expect(scripted.provider.resolveChat(WhatsAppChatId(bogus))).rejects.toThrow(WhatsAppError)
+      await expect(scripted.provider.resolveChat(WhatsAppChatId(bogus))).rejects.toThrow(/names no WhatsApp conversation/)
     }
+  })
+})
+
+describe('conversation names', () => {
+  const groupId = WhatsAppChatId('120363000000000000@g.us')
+
+  /** One inbound group message, which never carries the group's subject. */
+  function groupMessage(overrides: Partial<WhatsAppMessage> = {}): WhatsAppMessage {
+    const inbound = message({ chatId: groupId, chatKind: 'group', ...overrides })
+    delete (inbound as { chatName?: string }).chatName
+    return inbound
+  }
+
+  it('announces the name a direct message carries', async () => {
+    const scripted = await online()
+    scripted.emit({ kind: 'message', message: message() })
+    expect(scripted.named).toEqual([[chatId, 'Ana']])
+  })
+
+  it('announces a name once, and again only when it changed', async () => {
+    const scripted = await online()
+    scripted.emit({ kind: 'message', message: message() })
+    scripted.emit({ kind: 'message', message: message({ id: WhatsAppMessageId('M2') }) })
+    scripted.emit({ kind: 'message', message: message({ id: WhatsAppMessageId('M3'), chatName: 'Ana Souza' }) })
+    expect(scripted.named).toEqual([[chatId, 'Ana'], [chatId, 'Ana Souza']])
+    await expect(scripted.provider.resolveChat(chatId)).resolves.toMatchObject({ name: 'Ana Souza' })
+  })
+
+  it('asks the account for the subject of a group whose message carries none', async () => {
+    const scripted = await online({ groupSubject: 'Time' })
+    scripted.emit({ kind: 'message', message: groupMessage() })
+    await vi.waitFor(() => {
+      expect(scripted.named).toEqual([[groupId, 'Time']])
+    })
+    await expect(scripted.provider.listChats()).resolves.toMatchObject([{ id: groupId, name: 'Time' }])
+  })
+
+  it('asks once while a burst of messages from the same group is delivered', async () => {
+    const scripted = await online({ groupSubject: 'Time' })
+    for (const id of ['M1', 'M2', 'M3']) {
+      scripted.emit({ kind: 'message', message: groupMessage({ id: WhatsAppMessageId(id) }) })
+    }
+    const resolved = scripted.provider.resolveChat(groupId)
+    await expect(resolved).resolves.toMatchObject({ name: 'Time' })
+    expect(scripted.socket.subjectAsks).toEqual([groupId])
+  })
+
+  it('leaves a group unnamed when the account refuses the lookup, and reports it', async () => {
+    const scripted = await online({ subjectFails: true })
+    scripted.emit({ kind: 'message', message: groupMessage() })
+    await expect(scripted.provider.resolveChat(groupId)).resolves.toEqual({ id: groupId, kind: 'group', unreadCount: 1 })
+    expect(scripted.named).toEqual([])
+    expect(scripted.nameFailures).toEqual([groupId])
+  })
+
+  it('leaves a group unnamed while the connection is not online', async () => {
+    const scripted = rig({ groupSubject: 'Time' })
+    await scripted.provider.start()
+    await expect(scripted.provider.resolveChat(groupId)).resolves.toEqual({ id: groupId, kind: 'group', unreadCount: 0 })
+    expect(scripted.socket.subjectAsks).toEqual([])
+  })
+
+  it('names a conversation the roster reported before any message arrived', async () => {
+    const scripted = await online()
+    scripted.emit({ kind: 'chat-named', chatId: groupId, name: 'Time' })
+    expect(scripted.named).toEqual([[groupId, 'Time']])
+    // A roster name does not invent an observed conversation.
+    await expect(scripted.provider.listChats()).resolves.toStrictEqual([])
+    await expect(scripted.provider.resolveChat(groupId)).resolves.toMatchObject({ name: 'Time' })
+    expect(scripted.socket.subjectAsks).toEqual([])
+  })
+
+  it('carries a roster name into the conversation the first message opens', async () => {
+    const scripted = await online()
+    scripted.emit({ kind: 'chat-named', chatId: groupId, name: 'Time' })
+    scripted.emit({ kind: 'message', message: groupMessage() })
+    await expect(scripted.provider.listChats()).resolves.toEqual([
+      { id: groupId, kind: 'group', name: 'Time', unreadCount: 1 },
+    ])
   })
 })
 
@@ -388,7 +486,7 @@ describe('dispatch', () => {
     const scripted = await online()
     const signal = AbortSignal.abort()
     expect(() => scripted.provider.listChats(signal)).toThrow()
-    expect(() => scripted.provider.resolveChat(chatId, signal)).toThrow()
+    await expect(scripted.provider.resolveChat(chatId, signal)).rejects.toThrow()
     expect(() => scripted.provider.fetchMessages({ chatId }, signal)).toThrow()
     await expect(scripted.provider.send({ chatId, text: 'olá' }, signal)).rejects.toThrow()
     await expect(scripted.provider.markRead(chatId, signal)).rejects.toThrow()

@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-25-whatsapp-session-per-conversation.md
+2026-08-25-whatsapp-session-per-conversation.md: efa6f6947fbb051474ab96cc0fe5d2b35dcd29b7
+2026-08-25-whatsapp-session-per-conversation.zh.md: b4f7f22f7a6105b70c8eebad817069d79a9ad202

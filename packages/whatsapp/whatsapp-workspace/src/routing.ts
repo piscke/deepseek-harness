@@ -8,44 +8,59 @@
 import { createHash } from 'node:crypto'
 import { assertNever } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
-import type { WhatsAppMessage } from '@deepseek-ai/dsh-whatsapp'
+import type { WhatsAppChatKind, WhatsAppMessage } from '@deepseek-ai/dsh-whatsapp'
 import type { ResolvedConfig } from './index.ts'
-import type { WhatsAppRouteTarget } from './types.ts'
-
-/** Session id of the `category` route's group session. */
-export const GROUPS_SESSION_ID = SessionId('whatsapp-groups')
-/** Session id of the `category` route's direct-chat session. */
-export const CONTACTS_SESSION_ID = SessionId('whatsapp-contacts')
-/** Session id of the `single` route's one session. */
-export const CONVERSATIONS_SESSION_ID = SessionId('whatsapp-conversations')
 
 /**
- * Session id of one conversation under the `per-chat` route. A chat id is an
- * account-visible address containing characters a session id should not carry,
- * so the identity is a digest of it: stable across restarts and collision-free
- * where a character substitution would not be.
+ * Session id of one conversation. A chat id is an account-visible address
+ * containing characters a session id should not carry, so the identity is a
+ * digest of it: stable across restarts and collision-free where a character
+ * substitution would not be.
  * @param chatId - the conversation address to derive an identity from.
- * @returns the deterministic per-chat session id.
+ * @returns the deterministic per-conversation session id.
  */
 export function chatSessionId(chatId: string): SessionId {
   return SessionId(`whatsapp-chat-${createHash('sha256').update(chatId).digest('hex').slice(0, 16)}`)
 }
 
 /**
- * Whether the deployment routes this conversation at all. An allowlist, when
- * non-empty, is exhaustive; the denylist is applied afterwards, so a chat named
- * by both stays denied.
+ * Whether the configured scope covers conversations of this kind.
+ * @param config - the resolved routing policy.
+ * @param chatKind - what the conversation addresses.
+ * @returns whether a conversation of this kind opens a session.
+ */
+export function isRoutedKind(config: ResolvedConfig, chatKind: WhatsAppChatKind): boolean {
+  switch (config.chats) {
+    case 'all': return true
+    case 'groups': return chatKind === 'group'
+    case 'contacts': return chatKind === 'direct'
+    /* v8 ignore next -- WhatsAppChatScope is closed and every member is handled above. */
+    default: return assertNever(config.chats, 'WhatsAppChatScope')
+  }
+}
+
+/**
+ * Whether the deployment routes this conversation at all. The scope decides
+ * first, then the id lists: an allowlist, when non-empty, is exhaustive, and
+ * the denylist is applied afterwards, so a chat named by both stays denied.
+ *
+ * An allowlisted id still has to fall inside the scope, so narrowing `chats`
+ * never leaves a conversation routed by an entry the operator forgot.
  * @param config - the resolved routing policy.
  * @param chatId - the conversation address to judge.
+ * @param chatKind - what that conversation addresses.
  * @returns whether messages from this conversation reach a session.
  */
-export function isRoutedChat(config: ResolvedConfig, chatId: string): boolean {
+export function isRoutedChat(config: ResolvedConfig, chatId: string, chatKind: WhatsAppChatKind): boolean {
+  if (!isRoutedKind(config, chatKind)) return false
   if (config.denyChatIds.includes(chatId)) return false
   return config.allowChatIds.length === 0 || config.allowChatIds.includes(chatId)
 }
 
 /**
- * Resolve the session one observed message belongs to.
+ * Resolve the session one observed message belongs to. Every routed
+ * conversation owns its own session, so the identity is a digest of the chat
+ * id and one contact's history never mixes with another's.
  *
  * A message the connected account wrote (`fromMe`, including from another
  * device) is never routed: it is the echo of an answer the deployment already
@@ -55,43 +70,26 @@ export function isRoutedChat(config: ResolvedConfig, chatId: string): boolean {
  * rather than publishing it.
  * @param config - the resolved routing policy.
  * @param message - the observed message, as the seam normalized it.
- * @returns the target session and its pinned title, or `undefined` when the message is not routed.
+ * @returns the session that conversation owns, or `undefined` when the message is not routed.
  */
-export function routeMessage(config: ResolvedConfig, message: WhatsAppMessage): WhatsAppRouteTarget | undefined {
+export function routeMessage(config: ResolvedConfig, message: WhatsAppMessage): SessionId | undefined {
   if (message.fromMe) return undefined
-  if (!isRoutedChat(config, message.chatId)) return undefined
-  switch (config.route) {
-    case 'category': return message.chatKind === 'group'
-      ? { sessionId: GROUPS_SESSION_ID, title: config.groupsTitle }
-      : { sessionId: CONTACTS_SESSION_ID, title: config.contactsTitle }
-    case 'per-chat': return {
-      sessionId: chatSessionId(message.chatId),
-      title: message.chatName ?? message.chatId,
-    }
-    case 'single': return { sessionId: CONVERSATIONS_SESSION_ID, title: config.conversationsTitle }
-    /* v8 ignore next -- WhatsAppRouteMode is closed and every member is handled above. */
-    default: return assertNever(config.route, 'WhatsAppRouteMode')
-  }
+  if (!isRoutedChat(config, message.chatId, message.chatKind)) return undefined
+  return chatSessionId(message.chatId)
 }
 
 /**
- * The standing sessions a route opens before any message arrives, so the
- * Workspace is populated in the sidebar from load. The `per-chat` route opens
- * none: a conversation's session exists once that conversation is routed.
- * @param config - the resolved routing policy.
- * @returns the targets to create or resume at load, in display order.
+ * The title one conversation's session is pinned to. The account's own name
+ * for the conversation wins, because it is the one the operator recognizes and
+ * the only one that exists for a group; the name carried by the message is the
+ * fallback, and the chat id is what an unnamed conversation is called until a
+ * name is resolved.
+ * @param message - the observed message, as the seam normalized it.
+ * @param resolved - the conversation's name according to the account, when it has one.
+ * @returns the display title for that conversation's session.
  */
-export function standingTargets(config: ResolvedConfig): readonly WhatsAppRouteTarget[] {
-  switch (config.route) {
-    case 'category': return [
-      { sessionId: GROUPS_SESSION_ID, title: config.groupsTitle },
-      { sessionId: CONTACTS_SESSION_ID, title: config.contactsTitle },
-    ]
-    case 'per-chat': return []
-    case 'single': return [{ sessionId: CONVERSATIONS_SESSION_ID, title: config.conversationsTitle }]
-    /* v8 ignore next -- WhatsAppRouteMode is closed and every member is handled above. */
-    default: return assertNever(config.route, 'WhatsAppRouteMode')
-  }
+export function chatTitle(message: WhatsAppMessage, resolved?: string): string {
+  return resolved ?? message.chatName ?? message.chatId
 }
 
 /** The body as the model reads it; unsupported media names its type rather than vanishing. */
@@ -105,10 +103,10 @@ function renderBody(message: WhatsAppMessage): string {
 }
 
 /**
- * Frame one message for the session it enters. One session serves many
- * conversations under every route except `per-chat`, so the chat id and the
- * conversation's display name are part of the message rather than session
- * context the model is expected to remember.
+ * Frame one message for the session it enters. A session serves exactly one
+ * conversation, but the chat id is still part of the message: it is the value
+ * `whatsapp_send_message` needs to answer, and reading it out of the turn is
+ * more reliable than expecting the model to carry it from session context.
  * @param message - the observed message, as the seam normalized it.
  * @returns the text the follow-up turn carries.
  */

@@ -6,21 +6,20 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { AgentHandle } from '@deepseek-ai/dsh-agent'
 import type { SessionId } from '@deepseek-ai/dsh-session'
-import type { WhatsAppMessage } from '@deepseek-ai/dsh-whatsapp'
+import type { WhatsAppChatId, WhatsAppMessage } from '@deepseek-ai/dsh-whatsapp'
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
 import { WhatsAppSessionInbox } from './inbox.ts'
 import { renderThrown } from './diagnostics.ts'
-import { routeMessage, standingTargets } from './routing.ts'
+import { chatSessionId, chatTitle, routeMessage } from './routing.ts'
 import { SeenMessages } from './seen.ts'
-import { openSession } from './sessions.ts'
+import { openSession, pinTitle } from './sessions.ts'
+import type { OpenedSession } from './sessions.ts'
 import type { ResolvedConfig } from './index.ts'
-import type { WhatsAppRouteTarget } from './types.ts'
 
-/** One opened conversation session: the owned agent and its delivery queue. */
+/** One opened conversation session: the agent it runs on and its delivery queue. */
 interface RoutedSession {
-  readonly handle: AgentHandle
+  readonly opened: OpenedSession
   readonly inbox: WhatsAppSessionInbox
 }
 
@@ -30,49 +29,62 @@ export class WhatsAppInboundRouter {
   private readonly seen: SeenMessages
 
   /**
-   * @param ctx - context carrying the agent registry, persistence, title service, and logger.
-   * @param config - the resolved routing policy.
+   * @param ctx - context carrying the agent registry, persistence, title service, WhatsApp seam, and logger.
+   * @param policy - the currently authoritative routing policy, re-read per message so a
+   * settings change applies to the next one without reloading this plugin.
    * @param workspace - the WhatsApp Workspace every routed session is accounted to.
    */
   constructor(
     private readonly ctx: Context,
-    private readonly config: ResolvedConfig,
+    private readonly policy: () => ResolvedConfig,
     private readonly workspace: Workspace,
   ) {
-    this.seen = new SeenMessages(config.seenMessageLimit)
-  }
-
-  /**
-   * Open the sessions this route keeps standing, so the Workspace is populated
-   * before any message arrives. A failure here fails plugin load: a Workspace
-   * whose sessions could not be opened would show as empty with no explanation.
-   * @returns resolution after every standing session is opened, attached, and titled.
-   */
-  async openStandingSessions(): Promise<void> {
-    for (const target of standingTargets(this.config)) await this.open(target)
+    // The replay window is a process-lifetime buffer, so it is entry-only: a
+    // resized window mid-run would forget ids it is still suppressing.
+    this.seen = new SeenMessages(policy().seenMessageLimit)
   }
 
   /**
    * Route one observed message. Filtered conversations, the account's own
    * messages, and ids already delivered end here; everything else is queued
-   * against its session, opening that session on first use.
+   * against its conversation's session, opening that session on first use.
    *
    * A message that arrives while this router is being disposed is dropped by
    * the target queue, which stops accepting before its drain is awaited.
    * @param message - the observed message, as the seam normalized it.
    */
   accept(message: WhatsAppMessage): void {
-    const target = routeMessage(this.config, message)
-    if (target === undefined) return
+    const config = this.policy()
+    const sessionId = routeMessage(config, message)
+    if (sessionId === undefined) return
     if (!this.seen.admit(message.id)) return
-    void this.open(target).then(
+    void this.open(sessionId, message, config).then(
       (session) => { session.inbox.enqueue(message) },
       (error: unknown) => {
         this.ctx.logger.warn(
-          `whatsapp-workspace: could not open session "${target.sessionId}" for chat "${message.chatId}": `
+          `whatsapp-workspace: could not open session "${sessionId}" for chat "${message.chatId}": `
           + renderThrown(error),
         )
       },
+    )
+  }
+
+  /**
+   * Retitle the open session of a conversation the account has just named. A
+   * group's subject is rarely known when its first message arrives, and a
+   * conversation can be renamed at any time, so the title follows the name
+   * rather than being fixed at the moment the session was opened.
+   * @param chatId - the conversation that was named.
+   * @param name - its new display name.
+   */
+  rename(chatId: WhatsAppChatId, name: string): void {
+    const pending = this.sessions.get(chatSessionId(chatId))
+    if (pending === undefined) return
+    void pending.then(
+      (session) => { pinTitle(this.ctx, session.opened.agent.session, name) },
+      // A failed open is already reported by the `accept` that attempted it,
+      // and nothing here can retry it.
+      () => {},
     )
   }
 
@@ -83,21 +95,50 @@ export class WhatsAppInboundRouter {
     await Promise.allSettled(opened.map(async (pending) => {
       const session = await pending
       await session.inbox.dispose()
-      await session.handle.dispose()
+      // Only the agents this router opened are its to tear down; one it merely
+      // delivered into belongs to whoever published it.
+      await session.opened.handle?.dispose()
     }))
   }
 
   /** Open one session once; a failed open is forgotten so a later message retries it. */
-  private open(target: WhatsAppRouteTarget): Promise<RoutedSession> {
-    const existing = this.sessions.get(target.sessionId)
+  private open(sessionId: SessionId, message: WhatsAppMessage, config: ResolvedConfig): Promise<RoutedSession> {
+    const existing = this.sessions.get(sessionId)
     if (existing !== undefined) return existing
-    const opening = openSession(this.ctx, this.workspace, target)
-      .then(handle => ({ handle, inbox: new WhatsAppSessionInbox(this.ctx, handle.agent) }))
+    const opening = this.openConversation(sessionId, message, config)
       .catch((error: unknown) => {
-        this.sessions.delete(target.sessionId)
+        this.sessions.delete(sessionId)
         throw error
       })
-    this.sessions.set(target.sessionId, opening)
+    this.sessions.set(sessionId, opening)
     return opening
+  }
+
+  /** Title the conversation from the account, then open its session and its queue. */
+  private async openConversation(
+    sessionId: SessionId,
+    message: WhatsAppMessage,
+    config: ResolvedConfig,
+  ): Promise<RoutedSession> {
+    const title = chatTitle(message, await this.resolveName(message.chatId))
+    const opened = await openSession(this.ctx, this.workspace, { sessionId, title }, config.agentPreset)
+    return { opened, inbox: new WhatsAppSessionInbox(this.ctx, opened.agent) }
+  }
+
+  /**
+   * What the account calls this conversation. A disconnected or failing
+   * connection leaves the conversation unnamed rather than unrouted: the
+   * message still has to reach its session, and `whatsapp/chat-named` retitles
+   * it once the name is resolvable.
+   */
+  private async resolveName(chatId: WhatsAppChatId): Promise<string | undefined> {
+    try {
+      return (await this.ctx.whatsapp.resolveChat(chatId)).name
+    } catch (error: unknown) {
+      this.ctx.logger.warn(
+        `whatsapp-workspace: could not resolve a name for chat "${chatId}": ` + renderThrown(error),
+      )
+      return undefined
+    }
   }
 }

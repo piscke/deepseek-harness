@@ -30,9 +30,12 @@ The `pairing` payload is a credential, not a progress detail: whoever scans it l
 |---|---|
 | `whatsapp/status` | The connection state changed; a `pairing` payload is re-emitted whenever the provider rotates it. |
 | `whatsapp/message-received` | The provider observed a message, including one the account sent from another device (`fromMe`). |
+| `whatsapp/chat-named` | A conversation's display name became known or changed. |
 | `whatsapp/message-sent` | A send dispatched through this service was acknowledged. |
 
 Acknowledgement means WhatsApp accepted the message, not that it was delivered or read. A provider may repeat a `whatsapp/message-received` id after a reconnection replays history, so a consumer that must act once keeps its own processed-id set.
+
+A conversation's name arrives outside the message stream: a group's subject reaches the connection through its own update, so a group is routinely unnamed when its first message is observed and named moments later. `WhatsAppChat.name` is therefore a reading, not a fixed fact — a surface that displays it follows `whatsapp/chat-named` and corrects itself. The event fires only when the name the provider holds actually changes, so a reconnection that re-syncs the same roster is silent.
 
 ## Identity
 

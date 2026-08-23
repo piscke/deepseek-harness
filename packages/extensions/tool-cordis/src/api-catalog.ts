@@ -2717,6 +2717,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'exec', description: 'the execution object that traversed the pipeline.' }, { name: 'result', description: 'a deep-frozen snapshot of the final returned result.' }],
   },
   {
+    name: 'whatsapp/chat-named',
+    mode: 'emit',
+    signature: '\'whatsapp/chat-named\'(chatId: WhatsAppChatId, name: string): void',
+    summary: 'A conversation\'s display name became known or changed.',
+    description: 'A conversation\'s display name became known or changed. WhatsApp delivers a group\'s subject and a contact\'s name outside the message stream, so a conversation is routinely unnamed when its first message arrives and named moments later; a surface that pinned the address instead is expected to follow this event and correct itself.\n\nEmitted only when the name the provider holds actually changes, so a reconnection that re-syncs the same roster is silent.',
+    parameters: [{ name: 'chatId', description: 'the conversation that has a name.' }, { name: 'name', description: 'the display name, never empty.' }],
+  },
+  {
     name: 'whatsapp/message-received',
     mode: 'emit',
     signature: '\'whatsapp/message-received\'(message: WhatsAppMessage): void',

@@ -8,7 +8,8 @@
   "files": [
     "src/channel.ts",
     "src/index.ts",
-    "src/invariant.ts"
+    "src/invariant.ts",
+    "src/workspace-settings.ts"
   ],
   "references": [
     {

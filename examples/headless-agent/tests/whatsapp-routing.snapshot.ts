@@ -1,0 +1,88 @@
+/**
+ * Assembled-app snapshot for the WhatsApp Workspace: one inbound message opens
+ * one session for the conversation it came from, titled with the name the
+ * account resolves, and the turn runs inside that session. The account is
+ * scripted, so the transcript is the shipped routing path without a phone.
+ * @module whatsapp-routing-snapshot
+ */
+
+import { readFile, readdir, writeFile } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { normalizeSessionLog, scrubRequestHeaders, type NormalizeContext } from '@deepseek-ai/dsh-acp-snapshot'
+import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@deepseek-ai/dsh-loader-smoke'
+import { describe, expect, it } from 'vitest'
+
+const scenarioDir = join(dirname(fileURLToPath(import.meta.url)), 'whatsapp-snapshots/one-conversation')
+const replayFixture = join(scenarioDir, 'replay.jsonl')
+const replayOverride = join(scenarioDir, 'replay.override.json')
+const sessionExpected = join(scenarioDir, 'session.expected.jsonl')
+const configPath = fileURLToPath(new URL('../whatsapp-routing.cordis.snapshot.yml', import.meta.url))
+const binScript = fileURLToPath(new URL('./fixtures/whatsapp-inbound-driver.ts', import.meta.url))
+const tsconfigPath = fileURLToPath(new URL('../../../tsconfig.json', import.meta.url))
+const refreshing = process.env.DSH_SNAPSHOT === 'refresh'
+const inbound = 'boa tarde, confirmo as 18h'
+
+interface JsonObject {
+  [key: string]: unknown
+}
+
+function parseJsonl(content: string): JsonObject[] {
+  return content.split('\n').filter(line => line.trim().length > 0).map(line => JSON.parse(line) as JsonObject)
+}
+
+/** Read the one session the run persisted, failing loud when the count is not one. */
+async function persistedLog(cwd: string): Promise<string> {
+  const root = join(cwd, '.sessions')
+  const files = (await readdir(root, { recursive: true })).filter(file => file.endsWith('.jsonl'))
+  const file = files[0]
+  if (files.length !== 1 || file === undefined) {
+    throw new Error(`expected exactly one persisted session, found ${files.length}`)
+  }
+  return readFile(join(root, file), 'utf8')
+}
+
+describe('whatsapp per-conversation snapshot', () => {
+  it('opens one named session for the conversation the message came from', async () => {
+    let cwd = ''
+    const result = await runLoaderSmoke({
+      label: 'whatsapp per-conversation headless stream-json snapshot',
+      tempDirPrefix: 'dsh-whatsapp-one-conversation-',
+      binScript,
+      libBinScript: binScript,
+      configPath,
+      binArgs: [configPath, inbound],
+      tsconfigPath,
+      env: {
+        DSH_SNAPSHOT_FILE: replayFixture,
+        DSH_SNAPSHOT_OVERRIDE: replayOverride,
+      },
+      prepare: (runCwd: string) => {
+        cwd = runCwd
+      },
+      inspect: async () => {
+        const content = await persistedLog(cwd)
+        const header = parseJsonl(content)[0]
+        const normalization: NormalizeContext = {
+          sessionIds: typeof header?.id === 'string' ? [header.id] : [],
+          cwd,
+        }
+        const session = scrubRequestHeaders(normalizeSessionLog(content, normalization))
+        if (refreshing) await writeFile(sessionExpected, session)
+        expect(session).toBe(await readFile(sessionExpected, 'utf8'))
+
+        const records = parseJsonl(session)
+        // Model-visible ⟺ logged: the inbound message reached the model as an
+        // inbox entry of this conversation's own session.
+        expect(session).toContain(inbound)
+        // The conversation is titled by the name the account resolved, not by
+        // its address and not by an automatic summary.
+        const titles = records.filter(record => record.type === 'session/title')
+        expect(titles.at(-1)?.data).toMatchObject({ title: 'Ana', source: { kind: 'user' } })
+      },
+    })
+
+    expect(result.stderr).toBe('')
+    expect(parseJsonl(result.stdout).at(-1)).toMatchObject({ type: 'result', output: 'WHATSAPP_ROUTED', title: 'Ana' })
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+})

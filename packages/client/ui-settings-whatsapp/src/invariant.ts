@@ -11,7 +11,10 @@ export const name = 'client-ui-settings-whatsapp-invariant'
 /** Service required before the companion can reserve package ownership. */
 export const inject = ['invariants']
 
-/** No runtime invariant: this package owns a read-only Settings contribution. */
+/**
+ * No runtime invariant: this package contributes one Settings page whose only
+ * write goes through the settings scope, which owns that write's rules.
+ */
 const install: InvariantInstaller = () => {}
 
 /** Register this package's invariant companion. */

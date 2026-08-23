@@ -28,6 +28,8 @@ Status: implemented
 
 `route` 必填且没有默认值：`category`（一个 `Groups` 会话与一个 `Contacts` 会话）、`per-chat`（每段对话一个会话，首次接触时打开）或 `single`（全部合一）。`allowChatIds` 非空时即是穷尽列表，而 `denyChatIds` 优先于它。
 
+形态选择没有存活下来：[每段对话一个会话](2026-08-25-whatsapp-session-per-conversation.md)移除了 `route`、`category` 与 `single`，代之以 `chats`——它决定*哪些*对话拥有自己的会话。以下关于过滤、框架文本、投递、日志与工具的一切均未改变。
+
 有两条过滤源自 seam 自身的契约，不可配置。`fromMe` 消息永不路由——把部署自己的回答再送回去会用它自己的话唤醒 agent，而 seam 有意上报它们是因为状态显示需要。已投递过的消息 id 会被丢弃，因为 seam 的契约就是 provider 在重连后会重放历史。
 
 路由不做第三种判断。一次真实配对中成批出现的、无人撰写的 `whatsapp/message-received` 帧曾让这种判断看起来必要，本里程碑也一度带着一份 WhatsApp 信封字段名的丢弃清单。那是错的：seam 上报的是最先被解码的那个信封键，而 WhatsApp 会在大多数群消息上附带 `senderKeyDistributionMessage`，因此一份宽到足以捕获信令的清单，会丢掉一张发到群里的照片——而且是悄无声息、日志中毫无痕迹。seam 现在保证入站事件是某个人发出的东西，修复属于那里，在信封仍然完整的地方。在此处复制这份判断，只会在两份清单发生漂移的那一刻重建同一个隐患，因此本包完全不检视任何 WhatsApp 字段名。

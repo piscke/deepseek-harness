@@ -37,7 +37,16 @@
     - id: whatsapp-workspace
       name: '@deepseek-ai/dsh-whatsapp-workspace'
       config:
-        route: category
+        # Every routed conversation gets its own session, so a contact's history
+        # is that contact's alone. `all` answers groups and contacts; `groups` or
+        # `contacts` narrows it. Changeable while the harness runs from
+        # Settings › WhatsApp, which is what the page writes.
+        chats: all
+        # Agent preset each conversation session is composed under. Absent leaves
+        # every session with whatever the profile gives an agent; naming a preset
+        # is how one deployment answers WhatsApp with a narrower agent than the
+        # one its Web sessions use.
+        # agentPreset: whatsapp
         # Under the harness home for the same reason as `authDir`: the router's
         # own default is `~/.dsh/whatsapp` regardless of DSH_HOME, which would
         # leave a second account's conversations in the first one's directory

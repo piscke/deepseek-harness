@@ -3,16 +3,16 @@ import { homedir, tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { WhatsAppChatId, WhatsAppMessageId, type WhatsAppMessage } from '@deepseek-ai/dsh-whatsapp'
 import {
-  CONTACTS_SESSION_ID,
-  CONVERSATIONS_SESSION_ID,
-  GROUPS_SESSION_ID,
   SeenMessages,
+  applySettings,
   chatSessionId,
+  chatTitle,
   isRoutedChat,
+  isRoutedKind,
   renderInbound,
   resolveDirectory,
   routeMessage,
-  standingTargets,
+  settingsBase,
 } from '../src/index.ts'
 import type { ResolvedConfig } from '../src/index.ts'
 
@@ -23,10 +23,7 @@ function config(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
   return {
     directory: '~/.dsh/whatsapp',
     workspaceTitle: 'WhatsApp',
-    route: 'category',
-    groupsTitle: 'Groups',
-    contactsTitle: 'Contacts',
-    conversationsTitle: 'Conversations',
+    chats: 'all',
     allowChatIds: [],
     denyChatIds: [],
     seenMessageLimit: 1000,
@@ -60,28 +57,32 @@ function message(
 }
 
 describe('routing', () => {
-  it('routes a direct chat and a group to the category sessions', () => {
-    expect(routeMessage(config(), message())).toEqual({ sessionId: CONTACTS_SESSION_ID, title: 'Contacts' })
-    expect(routeMessage(config(), message({ chatId: groupId, chatKind: 'group' })))
-      .toEqual({ sessionId: GROUPS_SESSION_ID, title: 'Groups' })
-  })
-
-  it('routes every conversation to one session under the single route', () => {
-    const target = routeMessage(config({ route: 'single' }), message({ chatKind: 'group' }))
-    expect(target).toEqual({ sessionId: CONVERSATIONS_SESSION_ID, title: 'Conversations' })
-  })
-
-  it('derives a stable per-chat session identity and titles it by display name', () => {
-    const target = routeMessage(config({ route: 'per-chat' }), message())
-    expect(target).toEqual({ sessionId: chatSessionId(anaId), title: 'Ana' })
+  it('gives every conversation its own session, keyed by a stable digest of the chat id', () => {
+    expect(routeMessage(config(), message())).toBe(chatSessionId(anaId))
+    expect(routeMessage(config(), message({ chatId: groupId, chatKind: 'group' }))).toBe(chatSessionId(groupId))
     expect(chatSessionId(anaId)).toBe(chatSessionId(anaId))
     expect(chatSessionId(anaId)).not.toBe(chatSessionId(groupId))
     expect(chatSessionId(anaId)).toMatch(/^whatsapp-chat-[0-9a-f]{16}$/)
   })
 
-  it('falls back to the chat id when a per-chat conversation has no display name', () => {
-    const target = routeMessage(config({ route: 'per-chat' }), message({}, ['chatName']))
-    expect(target?.title).toBe(anaId)
+  it('answers only the conversation kinds the scope names', () => {
+    expect(isRoutedKind(config(), 'group')).toBe(true)
+    expect(isRoutedKind(config(), 'direct')).toBe(true)
+    expect(isRoutedKind(config({ chats: 'groups' }), 'direct')).toBe(false)
+    expect(isRoutedKind(config({ chats: 'contacts' }), 'group')).toBe(false)
+    expect(routeMessage(config({ chats: 'groups' }), message())).toBeUndefined()
+    expect(routeMessage(config({ chats: 'contacts' }), message({ chatId: groupId, chatKind: 'group' })))
+      .toBeUndefined()
+  })
+
+  it('keeps an allowlisted conversation outside the scope unrouted', () => {
+    expect(isRoutedChat(config({ chats: 'groups', allowChatIds: [anaId] }), anaId, 'direct')).toBe(false)
+  })
+
+  it('titles a conversation by the name the account resolved, then the message, then the address', () => {
+    expect(chatTitle(message(), 'Ana Silva')).toBe('Ana Silva')
+    expect(chatTitle(message())).toBe('Ana')
+    expect(chatTitle(message({}, ['chatName']))).toBe(anaId)
   })
 
   it('never routes a message the account itself wrote', () => {
@@ -91,25 +92,41 @@ describe('routing', () => {
   it.each(['imageMessage', 'senderKeyDistributionMessage', 'messageContextInfo', 'protocolMessage'])(
     'routes %s, because the seam publishes only what a person sent',
     (mediaType) => {
-      const target = routeMessage(config(), message({ content: { kind: 'unsupported', mediaType } }))
-      expect(target).toEqual({ sessionId: CONTACTS_SESSION_ID, title: 'Contacts' })
+      expect(routeMessage(config(), message({ content: { kind: 'unsupported', mediaType } })))
+        .toBe(chatSessionId(anaId))
     },
   )
 
   it('applies the denylist after the allowlist', () => {
-    expect(isRoutedChat(config(), anaId)).toBe(true)
-    expect(isRoutedChat(config({ allowChatIds: [groupId] }), anaId)).toBe(false)
-    expect(isRoutedChat(config({ allowChatIds: [anaId] }), anaId)).toBe(true)
-    expect(isRoutedChat(config({ allowChatIds: [anaId], denyChatIds: [anaId] }), anaId)).toBe(false)
+    expect(isRoutedChat(config(), anaId, 'direct')).toBe(true)
+    expect(isRoutedChat(config({ allowChatIds: [groupId] }), anaId, 'direct')).toBe(false)
+    expect(isRoutedChat(config({ allowChatIds: [anaId] }), anaId, 'direct')).toBe(true)
+    expect(isRoutedChat(config({ allowChatIds: [anaId], denyChatIds: [anaId] }), anaId, 'direct')).toBe(false)
     expect(routeMessage(config({ denyChatIds: [anaId] }), message())).toBeUndefined()
   })
+})
 
-  it('opens the standing sessions each route keeps populated', () => {
-    expect(standingTargets(config()).map(target => target.sessionId))
-      .toEqual([GROUPS_SESSION_ID, CONTACTS_SESSION_ID])
-    expect(standingTargets(config({ route: 'single' })).map(target => target.sessionId))
-      .toEqual([CONVERSATIONS_SESSION_ID])
-    expect(standingTargets(config({ route: 'per-chat' }))).toEqual([])
+describe('live settings', () => {
+  it('offers the composition entry as the base layer of the user-writable slice', () => {
+    expect(settingsBase(config({ chats: 'groups', denyChatIds: [anaId] })))
+      .toEqual({ chats: 'groups', allowChatIds: [], denyChatIds: [anaId] })
+    expect(settingsBase(config({ agentPreset: 'interpreter' })).agentPreset).toBe('interpreter')
+  })
+
+  it('folds a resolved section over the entry, keeping the composed value for what it leaves unset', () => {
+    const entry = config({ chats: 'all', agentPreset: 'interpreter' })
+    expect(applySettings(entry, { chats: 'contacts' }))
+      .toEqual({ ...entry, chats: 'contacts' })
+    expect(applySettings(entry, {})).toEqual(entry)
+    expect(applySettings(entry, { allowChatIds: [anaId], denyChatIds: [groupId], agentPreset: 'other' }))
+      .toEqual({ ...entry, allowChatIds: [anaId], denyChatIds: [groupId], agentPreset: 'other' })
+  })
+
+  it('judges the next message against the folded policy', () => {
+    const entry = config()
+    expect(routeMessage(applySettings(entry, { chats: 'groups' }), message())).toBeUndefined()
+    expect(routeMessage(applySettings(entry, { chats: 'groups' }), message({ chatId: groupId, chatKind: 'group' })))
+      .toBe(chatSessionId(groupId))
   })
 })
 

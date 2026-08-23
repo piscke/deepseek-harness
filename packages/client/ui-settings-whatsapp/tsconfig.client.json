@@ -8,13 +8,19 @@
   "files": [
     "src/channel.ts",
     "src/css-modules.d.ts",
+    "src/workspace-settings.ts",
     "src/client/index.ts",
+    "src/client/conversations.ts",
     "src/client/locales.ts",
+    "src/client/ConversationsCard.tsx",
     "src/client/WhatsAppSettingsSection.tsx"
   ],
   "references": [
     {
       "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../api/remotes/tsconfig.client.json"
     },
     {
       "path": "../connection/tsconfig.client.json"
