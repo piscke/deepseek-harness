@@ -1024,7 +1024,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'whatsapp/inbound': WhatsAppInboundEvent
 ```
 
-来源：[`packages/whatsapp/whatsapp-workspace/src/types.ts:62`](../packages/whatsapp/whatsapp-workspace/src/types.ts)
+来源：[`packages/whatsapp/whatsapp-workspace/src/types.ts:59`](../packages/whatsapp/whatsapp-workspace/src/types.ts)
 
 <a id="whatsappoutbound--log-only"></a>
 

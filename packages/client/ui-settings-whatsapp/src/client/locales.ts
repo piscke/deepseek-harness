@@ -21,6 +21,12 @@ export const zh = {
   loggedOutTitle: '已退出登录',
   loggedOutReason: '原因',
   loggedOutBody: '当前凭据已失效，需要重新扫码配对。',
+  chatsTitle: '会话',
+  chatsBody: '每个被回复的会话都有自己的 session（会话）和自己的记忆，标题即联系人或群的名称。',
+  chatsAll: '全部会话',
+  chatsGroups: '仅群聊',
+  chatsContacts: '仅联系人',
+  chatsReadOnly: '本次部署不保存偏好设置，该选择只能在 cordis.yml 中修改。',
 } satisfies Record<string, string>
 
 /** WhatsApp pairing section locale key union. */
@@ -47,4 +53,10 @@ export const en = {
   loggedOutTitle: 'Logged out',
   loggedOutReason: 'Reason',
   loggedOutBody: 'The current credentials are gone; the account has to pair again.',
+  chatsTitle: 'Conversations',
+  chatsBody: 'Every answered conversation gets its own session and its own memory, titled after the contact or group.',
+  chatsAll: 'All conversations',
+  chatsGroups: 'Groups only',
+  chatsContacts: 'Contacts only',
+  chatsReadOnly: 'This deployment stores no preferences, so the choice can only be changed in cordis.yml.',
 } satisfies Record<WhatsAppLocaleKey, string>

@@ -41,7 +41,13 @@ export type WhatsAppStatus =
 export interface WhatsAppChat {
   readonly id: WhatsAppChatId
   readonly kind: WhatsAppChatKind
-  /** Contact or group display name; absent when the account has never resolved one. */
+  /**
+   * Contact or group display name; absent when the account has never resolved
+   * one. A conversation is named later as often as at first contact — a group's
+   * subject reaches the connection through its own update, not through the
+   * message that mentions the group — so a consumer that displays this must
+   * follow `whatsapp/chat-named` rather than treating the first read as final.
+   */
   readonly name?: string
   /** Messages the account has not marked read, as reported by the provider. */
   readonly unreadCount: number
@@ -124,7 +130,9 @@ export interface WhatsAppProvider {
    * connection observed it. The provider owns this because it tracks WhatsApp's
    * address spaces; it must answer for an address it has never observed, and
    * reject only a value that names no conversation at all, with
-   * `WHATSAPP_UNKNOWN_CHAT`.
+   * `WHATSAPP_UNKNOWN_CHAT`. A name this call had to fetch is published on
+   * `whatsapp/chat-named` as well, so a consumer that already resolved the
+   * conversation learns the name without asking again.
    */
   resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat>
   /**
@@ -171,6 +179,20 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'whatsapp/message-received'(message: WhatsAppMessage): void
+    /**
+     * A conversation's display name became known or changed. WhatsApp delivers
+     * a group's subject and a contact's name outside the message stream, so a
+     * conversation is routinely unnamed when its first message arrives and
+     * named moments later; a surface that pinned the address instead is
+     * expected to follow this event and correct itself.
+     *
+     * Emitted only when the name the provider holds actually changes, so a
+     * reconnection that re-syncs the same roster is silent.
+     * @param chatId - the conversation that has a name.
+     * @param name - the display name, never empty.
+     * @mode emit
+     */
+    'whatsapp/chat-named'(chatId: WhatsAppChatId, name: string): void
     /**
      * The provider acknowledged one send requested through `ctx.whatsapp`.
      * Acknowledgement means WhatsApp accepted the message, not that it reached

@@ -4,17 +4,26 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { WhatsAppStatus } from '@deepseek-ai/dsh-whatsapp'
 import { WhatsAppSettingsSection, StatusCard } from '../src/client/WhatsAppSettingsSection.tsx'
 import type { WhatsAppSettingsSectionProps } from '../src/client/WhatsAppSettingsSection.tsx'
+import type { ConversationsController } from '../src/client/conversations.ts'
 import { en, type WhatsAppLocaleKey } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
 const t = ((key: WhatsAppLocaleKey): string => en[key]) as WhatsAppSettingsSectionProps['t']
 
+/** A Workspace that serves no routing choice, so the section shows the pairing card alone. */
+const absent = { phase: 'absent' as const, chats: 'all' as const, writable: false }
+const noConversations = {
+  read: () => absent,
+  subscribe: () => () => {},
+  select: () => {},
+} as unknown as ConversationsController
+
 function props(
   readStatus: WhatsAppSettingsSectionProps['readStatus'],
   pollIntervalMs = 2_000,
 ): WhatsAppSettingsSectionProps {
-  return { t, readStatus, pollIntervalMs } as WhatsAppSettingsSectionProps
+  return { t, readStatus, pollIntervalMs, conversations: noConversations } as WhatsAppSettingsSectionProps
 }
 
 function state(container: HTMLElement): string | null {

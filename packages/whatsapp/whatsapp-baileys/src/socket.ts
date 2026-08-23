@@ -95,6 +95,37 @@ export interface BaileysConnectionUpdate {
   } | null
 }
 
+/**
+ * Baileys streams that carry conversation names. Chats, contacts, and groups
+ * each have their own stream and their own name field, but a consumer that only
+ * wants a display name treats them alike, so the binding subscribes to all of
+ * them with one listener.
+ */
+export type BaileysRosterEvent =
+  | 'chats.upsert'
+  | 'chats.update'
+  | 'contacts.upsert'
+  | 'contacts.update'
+  | 'groups.upsert'
+  | 'groups.update'
+
+/**
+ * One roster entry as Baileys reports it. The name fields are declared together
+ * because the streams share this listener; an entry carries whichever ones its
+ * own stream defines.
+ */
+export interface BaileysRosterEntry {
+  readonly id?: string | null
+  /** Address-book name of a contact, or a chat's stored name. */
+  readonly name?: string | null
+  /** A business account's verified name. */
+  readonly verifiedName?: string | null
+  /** The contact's own display name, as it reaches the account on messages. */
+  readonly notify?: string | null
+  /** A group's subject. */
+  readonly subject?: string | null
+}
+
 /** One live Baileys connection. */
 export interface BaileysSocket {
   readonly user?: { readonly id: string } | undefined
@@ -102,6 +133,7 @@ export interface BaileysSocket {
     on(event: 'connection.update', listener: (update: BaileysConnectionUpdate) => void): void
     on(event: 'creds.update', listener: () => void): void
     on(event: 'messages.upsert', listener: (batch: { readonly messages: readonly BaileysMessage[] }) => void): void
+    on(event: BaileysRosterEvent, listener: (entries: readonly BaileysRosterEntry[]) => void): void
   }
   sendMessage(
     jid: string,
@@ -109,6 +141,8 @@ export interface BaileysSocket {
     options?: { quoted: BaileysMessage },
   ): Promise<BaileysMessage | undefined>
   readMessages(keys: readonly BaileysKey[]): Promise<void>
+  /** Read one group's metadata; the only name lookup WhatsApp answers on demand. */
+  groupMetadata(jid: string): Promise<{ readonly subject?: string | null } | null | undefined>
   end(error: Error | undefined): void
 }
 
@@ -138,6 +172,7 @@ export type SocketEvent =
   | { readonly kind: 'open'; readonly accountId?: string }
   | { readonly kind: 'closed'; readonly loggedOut: boolean; readonly reason: string }
   | { readonly kind: 'message'; readonly message: WhatsAppMessage }
+  | { readonly kind: 'chat-named'; readonly chatId: WhatsAppChatId; readonly name: string }
 
 /** One live connection, as the provider uses it. */
 export interface WhatsAppSocket {
@@ -145,6 +180,14 @@ export interface WhatsAppSocket {
   sendText(request: WhatsAppSendRequest): Promise<WhatsAppSentMessage>
   /** Mark the chat read up to the newest message this socket observed in it. */
   markRead(chatId: WhatsAppChatId): Promise<void>
+  /**
+   * Ask the account for one group's subject. This is the only name WhatsApp
+   * answers on demand: a contact's name reaches the connection through the
+   * roster streams instead, and arrives as a `chat-named` observation.
+   * @param chatId - the group conversation to name.
+   * @returns the subject, or `undefined` when the group has none.
+   */
+  fetchGroupSubject(chatId: WhatsAppChatId): Promise<string | undefined>
   /** Close the connection without logging the account out. */
   close(): Promise<void>
 }
@@ -285,6 +328,15 @@ function bindSocket(
     }
   })
 
+  for (const stream of ROSTER_EVENTS) {
+    socket.ev.on(stream, (entries) => {
+      for (const entry of entries) {
+        const named = normalizeRosterEntry(entry)
+        if (named !== undefined) onEvent(named)
+      }
+    })
+  }
+
   return {
     async sendText(request) {
       const acknowledged = await socket.sendMessage(
@@ -312,11 +364,53 @@ function bindSocket(
       }
       await socket.readMessages([key])
     },
+    async fetchGroupSubject(chatId) {
+      if (chatKindOf(chatId) !== 'group') return undefined
+      return displayName(await socket.groupMetadata(chatId))
+    },
     close() {
       socket.end(undefined)
       return Promise.resolve()
     },
   }
+}
+
+/** Every roster stream the binding subscribes to, in one place so none is forgotten. */
+const ROSTER_EVENTS: readonly BaileysRosterEvent[] = [
+  'chats.upsert',
+  'chats.update',
+  'contacts.upsert',
+  'contacts.update',
+  'groups.upsert',
+  'groups.update',
+]
+
+/**
+ * The display name carried by one roster entry or group metadata.
+ *
+ * The order is how much the account itself chose the name: an address-book
+ * `name` and a group `subject` are what the operator sees in WhatsApp, a
+ * business `verifiedName` is next, and `notify` — the name the other party
+ * picked for themselves — is the last resort. A blank value is no name.
+ * @param entry - one roster entry, or the metadata of one group.
+ * @returns the name, or `undefined` when the entry carries none.
+ */
+function displayName(entry: BaileysRosterEntry | null | undefined): string | undefined {
+  const candidate = entry?.name ?? entry?.subject ?? entry?.verifiedName ?? entry?.notify
+  const trimmed = candidate?.trim()
+  return trimmed === undefined || trimmed === '' ? undefined : trimmed
+}
+
+/**
+ * Normalize one roster entry into a naming observation.
+ * @param entry - one entry of a chats, contacts, or groups batch.
+ * @returns the observation, or `undefined` when the entry names no conversation.
+ */
+function normalizeRosterEntry(entry: BaileysRosterEntry): SocketEvent | undefined {
+  const id = entry.id
+  const name = displayName(entry)
+  if (id === null || id === undefined || id === '' || name === undefined) return undefined
+  return { kind: 'chat-named', chatId: WhatsAppChatId(id), name }
 }
 
 /**

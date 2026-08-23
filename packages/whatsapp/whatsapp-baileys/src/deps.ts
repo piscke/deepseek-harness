@@ -25,6 +25,10 @@ export function providerDeps(
     open,
     onStatus: (status) => { ctx.emit('whatsapp/status', status) },
     onMessage: (message) => { ctx.emit('whatsapp/message-received', message) },
+    onChatNamed: (chatId, name) => { ctx.emit('whatsapp/chat-named', chatId, name) },
+    onNameFailure: (chatId, error) => {
+      ctx.logger.warn(`whatsapp-baileys: could not read the subject of group ${chatId}: ${String(error)}`)
+    },
     onFatal: (error) => { ctx.logger.error(error) },
     setTimer: (callback, delay) => {
       // `.unref()` so a pending reconnection never keeps the process alive.

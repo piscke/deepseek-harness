@@ -10,6 +10,7 @@ const chatId = WhatsAppChatId('5511999990000@s.whatsapp.net')
 const port: WhatsAppSocket = {
   sendText: () => Promise.reject(new Error('unused')),
   markRead: () => Promise.resolve(),
+  fetchGroupSubject: () => Promise.reject(new Error('unused')),
   close: () => Promise.resolve(),
 }
 
@@ -51,6 +52,23 @@ describe('provider collaborators', () => {
     }
     composed.onMessage(message)
     expect(seen).toEqual([message])
+  })
+
+  it('publishes a conversation name on the fiber', async () => {
+    const { ctx, composed } = await deps()
+    const named: [string, string][] = []
+    ctx.on('whatsapp/chat-named', (id, name) => named.push([id, name]))
+    composed.onChatNamed(chatId, 'Ana')
+    expect(named).toEqual([[chatId, 'Ana']])
+  })
+
+  it('reports an unreadable group subject without ending the connection', async () => {
+    const { ctx, composed } = await deps()
+    const warn = vi.spyOn(ctx.logger, 'warn').mockImplementation(() => {})
+    composed.onNameFailure(WhatsAppChatId('120363000000000000@g.us'), new Error('not a participant'))
+    expect(warn).toHaveBeenCalledWith(
+      'whatsapp-baileys: could not read the subject of group 120363000000000000@g.us: Error: not a participant',
+    )
   })
 
   it('routes a fatal failure to the fiber log', async () => {

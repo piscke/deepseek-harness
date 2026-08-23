@@ -11,6 +11,7 @@ import { WhatsAppError } from '@deepseek-ai/dsh-whatsapp'
 import type {
   WhatsAppChat,
   WhatsAppChatId,
+  WhatsAppChatKind,
   WhatsAppHistoryRequest,
   WhatsAppMessage,
   WhatsAppProvider,
@@ -40,6 +41,10 @@ export interface BaileysProviderDeps {
   readonly onStatus: (status: WhatsAppStatus) => void
   /** Publishes one observed message. */
   readonly onMessage: (message: WhatsAppMessage) => void
+  /** Publishes one conversation whose display name became known or changed. */
+  readonly onChatNamed: (chatId: WhatsAppChatId, name: string) => void
+  /** Reports a group whose subject could not be read; the conversation stays usable but unnamed. */
+  readonly onNameFailure: (chatId: WhatsAppChatId, error: unknown) => void
   /** Reports a failure that ends the provider's usability. */
   readonly onFatal: (error: unknown) => void
   /** Schedules `callback` after `delay` milliseconds; the return value cancels it. */
@@ -75,6 +80,15 @@ export class BaileysProvider implements WhatsAppProvider {
   private terminal = false
   private disposed = false
   private readonly chats = new Map<string, ChatRecord>()
+  /**
+   * Every conversation name this connection knows, including conversations it
+   * has observed no message in. Kept apart from {@link chats} so a roster sync
+   * names conversations without inventing observed ones: `listChats` answers
+   * for what the connection saw, and this only decides what those are called.
+   */
+  private readonly names = new Map<string, string>()
+  /** Group-subject lookups in flight, so a burst of messages asks the account once. */
+  private readonly nameLookups = new Map<string, Promise<string | undefined>>()
 
   constructor(private readonly deps: BaileysProviderDeps) {}
 
@@ -111,12 +125,20 @@ export class BaileysProvider implements WhatsAppProvider {
     return Promise.resolve(chats.map(record => record.chat))
   }
 
-  resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat> {
+  async resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat> {
     signal?.throwIfAborted()
     const record = this.chats.get(chatId)
-    if (record !== undefined) return Promise.resolve(record.chat)
-    assertAddressable(chatId)
-    return Promise.resolve({ id: chatId, kind: chatKindOf(chatId), unreadCount: 0 })
+    if (record === undefined) assertAddressable(chatId)
+    const kind = record?.chat.kind ?? chatKindOf(chatId)
+    // A group's messages carry no subject, so the first resolution of one is
+    // what asks the account for it.
+    const name = record?.chat.name ?? await this.nameOf(chatId, kind)
+    return {
+      id: chatId,
+      kind,
+      ...name === undefined ? {} : { name },
+      unreadCount: record?.chat.unreadCount ?? 0,
+    }
   }
 
   fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Promise<readonly WhatsAppMessage[]> {
@@ -207,6 +229,9 @@ export class BaileysProvider implements WhatsAppProvider {
         this.record(event.message)
         this.deps.onMessage(event.message)
         return
+      case 'chat-named':
+        this.learnName(event.chatId, event.name)
+        return
       default:
         assertNever(event)
     }
@@ -237,13 +262,14 @@ export class BaileysProvider implements WhatsAppProvider {
   /** Index one observed message, dropping a repeat of an id already retained. */
   private record(message: WhatsAppMessage): void {
     const existing = this.chats.get(message.chatId)
+    const known = this.names.get(message.chatId)
     const record = existing ?? {
       messages: [],
       seen: new Set<string>(),
       chat: {
         id: message.chatId,
         kind: message.chatKind,
-        ...message.chatName === undefined ? {} : { name: message.chatName },
+        ...known === undefined ? {} : { name: known },
         unreadCount: 0,
       },
       newest: message.timestamp,
@@ -261,6 +287,76 @@ export class BaileysProvider implements WhatsAppProvider {
       ...record.chat,
       unreadCount: message.fromMe ? 0 : record.chat.unreadCount + 1,
     }
+    this.nameFrom(message)
+  }
+
+  /** Take the conversation's name from the message, or ask the account for a group's subject. */
+  private nameFrom(message: WhatsAppMessage): void {
+    if (message.chatName !== undefined) {
+      this.learnName(message.chatId, message.chatName)
+      return
+    }
+    if (message.chatKind !== 'group' || this.names.has(message.chatId)) return
+    // Naming must never delay delivering the message that revealed the group:
+    // the subject reaches consumers through `chat-named` when the lookup lands.
+    void this.fetchGroupSubject(message.chatId)
+  }
+
+  /**
+   * Retain what one conversation is called and announce a name that changed.
+   * @param chatId - the conversation the name belongs to.
+   * @param name - the display name this connection resolved.
+   */
+  private learnName(chatId: WhatsAppChatId, name: string): void {
+    if (this.names.get(chatId) === name) return
+    this.names.set(chatId, name)
+    const record = this.chats.get(chatId)
+    if (record !== undefined) record.chat = { ...record.chat, name }
+    this.deps.onChatNamed(chatId, name)
+  }
+
+  /**
+   * The conversation's name: the one this connection knows, or the one only the
+   * account can answer for.
+   * @param chatId - the conversation to name.
+   * @param kind - what that conversation is, since only a group needs a lookup.
+   * @returns the display name, or `undefined` while the connection has none.
+   */
+  private async nameOf(chatId: WhatsAppChatId, kind: WhatsAppChatKind): Promise<string | undefined> {
+    const known = this.names.get(chatId)
+    if (known !== undefined) return known
+    if (kind !== 'group') return undefined
+    return await this.fetchGroupSubject(chatId)
+  }
+
+  /**
+   * Ask the account for one group's subject, collapsing concurrent asks for the
+   * same group into the one request in flight.
+   *
+   * A lookup that fails leaves the group unnamed rather than failing the caller:
+   * an unnamed conversation still routes, and the next roster update names it.
+   * @param chatId - the group to look up.
+   * @returns the subject, or `undefined` when offline or when the lookup failed.
+   */
+  private fetchGroupSubject(chatId: WhatsAppChatId): Promise<string | undefined> {
+    const inflight = this.nameLookups.get(chatId)
+    if (inflight !== undefined) return inflight
+    const socket = this.socket
+    if (socket === undefined || this.state.state !== 'online') return Promise.resolve(undefined)
+    const lookup = socket.fetchGroupSubject(chatId).then(
+      (name) => {
+        if (name !== undefined) this.learnName(chatId, name)
+        return name
+      },
+      (error: unknown) => {
+        this.deps.onNameFailure(chatId, error)
+        return undefined
+      },
+    ).finally(() => {
+      this.nameLookups.delete(chatId)
+    })
+    this.nameLookups.set(chatId, lookup)
+    return lookup
   }
 
   /** Publish a transition, collapsing a repeat of the state already reported. */

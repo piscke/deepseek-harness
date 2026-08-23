@@ -2,32 +2,34 @@
 
 [English](README.md) | 中文
 
-WhatsApp 工作区：一个注册为 [Workspace](../../workspace/workspace/README.md) 的专用目录、住在其中的会话，以及把账号的入站消息流作为排队的后续轮次投递进这些会话。
+WhatsApp 工作区：一个注册为 [Workspace](../../workspace/workspace/README.md) 的专用目录、其中每段对话各自一个会话，以及把账号的入站消息流作为排队的后续轮次投递进这些会话。
 
 这是 [WhatsApp 能力 seam](../whatsapp/README.md)（`ctx.whatsapp`）的消费方。它不注册 provider，也不注册工具——回复一段对话是 [`dsh-tool-whatsapp`](../tool-whatsapp/README.md) 的事。
 
 ## 加载时做什么
 
 1. 解析 `directory`（开头的 `~` 展开为用户主目录）并创建它。
-2. 通过 `ctx.workspaceRegistry.create(path, workspaceTitle)` 注册它，于是 Web UI 侧栏里会在仓库工作区旁边出现一个 WhatsApp 工作区。
-3. 订阅 `whatsapp/message-received`。
-4. 打开该路由的常驻会话，每个会话的 `cwd` 都等于那个目录，用 `attachSession` 挂载它们，并固定它们的标题。
+2. 把策略中可实时变更的那一部分注册为设置区段，于是运行中的部署无需重新加载即可改变路由什么。
+3. 通过 `ctx.workspaceRegistry.create(path, workspaceTitle)` 注册该目录，于是 Web UI 侧栏里会在仓库工作区旁边出现一个 WhatsApp 工作区。
+4. 订阅 `whatsapp/message-received` 与 `whatsapp/chat-named`。
 
-订阅安装在常驻会话打开之前，因此启动过程中观察到的消息会排队，而不会丢失。
+加载时不打开任何会话。一段对话的会话在该对话首次被路由时创建，因此全新的部署起初是一个空工作区，此后会列出它回答过的每一段对话——会话与工作区的挂载是持久的。
 
-任何一步无法完成都会让插件加载失败：不可用的目录、拒绝该路径的注册表、打不开的常驻会话。一个悄无声息永远不出现的工作区，与一个断线的账号无法区分。
+任何一步无法完成都会让插件加载失败：不可用的目录、拒绝该路径的注册表。一个悄无声息永远不出现的工作区，与一个断线的账号无法区分。
 
 ## 路由
 
-`route` 决定对话如何映射到会话，并且它是必填的——没有哪一种形态适合所有部署。
+一段对话就是一个会话，始终如此。一个联系人与一个群各自拥有自己的日志、自己的标题与自己的 agent，这正是「按联系人的解读器」得以成立的前提：模型读到的历史只属于那个联系人，不掺入他人。
 
-| 模式 | 会话 | 适用 |
-|---|---|---|
-| `category` | 两个常驻会话，`groupsTitle` 与 `contactsTitle` | 每类对话一个 agent。对于把群聊与个人分开分诊的助手，这是默认形态。 |
-| `per-chat` | 每段对话一个会话，在该对话首次被路由时打开 | 长期、彼此独立的线程。不打开任何常驻会话，因此工作区起初是空的。 |
-| `single` | 一个常驻会话，`conversationsTitle` | 最小的组合：一切都在一处。 |
+`chats` 决定哪些对话会打开会话：
 
-`allowChatIds` 非空时即是穷尽列表；`denyChatIds` 随后生效，因此同时出现在两者中的会话仍被拒绝。
+| 范围 | 路由 |
+|---|---|
+| `all` | 全部对话，群聊与私聊。 |
+| `groups` | 仅群聊对话。 |
+| `contacts` | 仅私聊对话。 |
+
+`allowChatIds` 非空时即是穷尽列表；`denyChatIds` 随后生效，因此同时出现在两者中的会话仍被拒绝。两者都在 `chats` 之后判定，因此收窄范围绝不会因为操作者忘记删除的白名单条目而让某段对话继续被路由。
 
 有两条过滤是部署无法关闭的策略。账号自己写的消息（`fromMe`，包括来自另一台设备的）永不路由，因为把部署自己的回答再送回去会用它自己的话唤醒 agent。已经投递过的消息 id 会被丢弃，因为 provider 在重连后会重放历史。
 
@@ -35,7 +37,7 @@ WhatsApp 工作区：一个注册为 [Workspace](../../workspace/workspace/READM
 
 ### 每条消息都标明自己的对话
 
-在 `category` 与 `single` 下，一个会话服务多段对话，因此对话身份是每条消息的一部分，而不是指望模型记住的上下文：
+一个会话恰好服务一段对话，而对话 id 仍然是每条消息的一部分：
 
 ```text
 WhatsApp message in direct chat "Ana" [chat_id: 5511999990000@s.whatsapp.net]
@@ -45,7 +47,7 @@ Sent: 2026-08-21T10:00:00.000Z
 boa tarde, você pode confirmar o horário?
 ```
 
-那个 `[chat_id: …]` 头部正是 `whatsapp_send_message` 所需要的值，因此回复给对的人是复制，而不是推断。
+那个 `[chat_id: …]` 头部正是 `whatsapp_send_message` 所需要的值，因此回复给对的人是从这一轮里复制，而不是要模型从会话上下文中带着这个事实走。
 
 ## 排队投递，永不打断
 
@@ -57,9 +59,33 @@ boa tarde, você pode confirmar o horário?
 
 ## 会话
 
-会话标识是确定性的（`whatsapp-groups`、`whatsapp-contacts`、`whatsapp-conversations`，以及 `per-chat` 的 `whatsapp-chat-<digest>`），因此重启会恢复同一段对话，而不是开一段空的。记录在另一个项目目录下的已存会话会带着两个路径大声失败：这意味着部署在旧目录仍有日志时移动了 `directory`。
+一段对话的会话标识是 `whatsapp-chat-<digest>`，摘要取自对话 id：跨重启稳定，且不含账号地址携带的那些字符。因此重启会继续那段对话，而不是开一段空的。
 
-标题用 `ctx.sessionTitle.rename()` 固定，其 `user` 来源会永久停止自动标题生成。标题未变时会跳过重新固定，因此重启不会追加一条冗余事件。
+打开一段对话时，按以下顺序解析到一个活的 agent：
+
+1. 该标识上已经发布的 agent——操作者正在 Web UI 中打开这段对话——会被直接投递，而不是在同一份日志上第二次恢复。拆卸时只释放本路由自己打开的会话。
+2. 已持久化的日志会被恢复，并按该日志中记录的 preset 组合，而不是部署当前的 `agentPreset`：会话中已有的轮次是在它记录下来的那份组合下产生的。
+3. 否则创建新会话，按 `agentPreset` 组合，`cwd` 设为工作区目录。
+
+新对话在 `ctx.agentDefaultModel.currentSelection()` 上作答——与其他任何地方新建会话拿到的默认值相同。入站消息面前没有操作者来挑选模型。
+
+记录在另一个项目目录下的已存会话会带着两个路径大声失败：这意味着部署在旧目录仍有日志时移动了 `directory`。
+
+标题就是对话的名字：先是账号为该对话解析出的名字，再是消息携带的名字，最后是尚无人命名的对话的对话 id。`whatsapp/chat-named` 会为已打开的会话改名，这正是首条消息到达时主题未知的群最终会落在自己主题之下的方式，也是被改名的对话得以跟随的方式。标题用 `ctx.sessionTitle.rename()` 固定，其 `user` 来源会永久停止自动标题生成；标题未变时会跳过重新固定，因此重启不会追加一条冗余事件。
+
+## 回答一段对话的 agent
+
+`agentPreset` 指定在每个对话会话创建时挂载的[预设](../../preset/agent-presets/README.md)——决定拿联系人所说的话做什么的那个解读器。缺省时不挂载任何东西，会话就运行在组合给每个 agent 的东西之上。预设名册通过 `ctx.get` 读取而非注入，因此没有名册的 headless 组合照常工作。
+
+改动 `agentPreset` 对此后打开的对话生效。已经产生过的会话保留其日志中记录的 preset。
+
+## 实时设置
+
+`chats`、`allowChatIds`、`denyChatIds` 与 `agentPreset` 同时也是一个设置区段，在「设置 › WhatsApp」中与配对二维码并排编辑（[`dsh-client-ui-settings-whatsapp`](../../client/ui-settings-whatsapp/README.md)）。路由器按消息读取当前权威策略，因此范围变更对下一条消息即刻生效，无需重新加载；`agentPreset` 的变更对下一段打开的对话生效。
+
+`directory` 与 `workspaceTitle` 被刻意排除在该区段之外：它们决定工作区的身份，而身份在插件加载时固定，不能在已经挂载其上的会话之下改变。
+
+存储文档未设置的字段保留组合配置项的值，因此清除一项设置是恢复部署所交付的值，而不是把该字段清空。
 
 ## 配置
 
@@ -67,23 +93,19 @@ boa tarde, você pode confirmar o horário?
 |---|---|---|
 | `directory` | `~/.dsh/whatsapp` | 工作区拥有、且每个对话会话都在其中运行的目录。必须解析为绝对路径。 |
 | `workspaceTitle` | `WhatsApp` | 工作区在侧栏中的标题。 |
-| `route` | *（必填）* | `category`、`per-chat` 或 `single`。 |
-| `groupsTitle` | `Groups` | `category` 路由的群聊会话标题。 |
-| `contactsTitle` | `Contacts` | `category` 路由的私聊会话标题。 |
-| `conversationsTitle` | `Conversations` | `single` 路由那一个会话的标题。 |
+| `chats` | `all` | 哪些对话会打开会话：`all`、`groups` 或 `contacts`。 |
 | `allowChatIds` | `[]` | 非空时，只有其中的对话会被路由。 |
 | `denyChatIds` | `[]` | 永不路由的对话。 |
+| `agentPreset` | *（无）* | 每个对话会话创建时挂载的预设。 |
 | `seenMessageLimit` | `1000` | 记住多少条已投递消息 id，用以压制 provider 的历史重放。 |
-
-标题是配置而非常量，因为它们由人以自己的语言阅读：
 
 ```yaml
 - id: whatsapp-workspace
   name: '@deepseek-ai/dsh-whatsapp-workspace'
   config:
-    route: category
-    groupsTitle: Grupos
-    contactsTitle: Contatos
+    chats: contacts
+    workspaceTitle: WhatsApp
+    agentPreset: interpreter
 ```
 
 `create` 会复用已经拥有该规范路径的记录并保留其标题，因此操作者在 UI 中改过的标题能挺过重启。
@@ -128,5 +150,6 @@ alguém pode buscar o bolo?
 - **路由信任 seam 的规则：入站事件即人发出的消息** —— 本包不做任何自己的内容判断，因此若某个 provider 发布了投递元数据或协议杂务，就会为它花掉一个回合。那是该 provider 需要修复的缺陷，而在这里复制一份判断，只会在两份清单发生漂移的那一刻悄悄丢掉真实媒体。
 - **去重在内存中** —— `seenMessageLimit` 个 id 与插件同生共死，因此重启后 provider 重放的消息可能被再次投递。持久的 `whatsapp/inbound` 日志知道得更准；在加载时查询它被推迟。
 - **agent 的回复不会被发到任何地方** —— 本包把消息投递进会话。agent 是否回答、回答给谁，是模型通过 `whatsapp_send_message` 做的决定，而那个工具每次都会询问操作者。按设计，这里没有自动回复路径。
-- **`per-chat` 无上限地打开会话** —— 每段对话一个会话，首次接触时创建，既不淘汰也无上限。对话很多的账号应当使用 `allowChatIds` 或分类路由。
+- **会话无上限地打开** —— 每段对话一个会话，首次接触时创建，既不淘汰也无上限。`chats`、`allowChatIds` 与 `denyChatIds` 就是对话很多的账号所拥有的控制手段。
+- **更早的常驻会话形态所留下的会话不再被路由** —— 运行过已移除的 `category` 或 `single` 形态的部署，其日志仍挂载在工作区上且可读，新消息会在它们旁边打开按对话的会话。不迁移，也不删除。
 - **每个工作区一个账号，每个账号一个进程** —— seam 只持有一个已认证账号，因此第二个账号意味着第二个 fiber 及其自己的目录。更严格的规则来自 provider：两个连接共用一个认证目录时会互相顶替已链接设备，较早的那个会以连接冲突死亡。与前一个进程重叠的重启，或指向同一目录的第二个 harness，会让账号下线，而不是共享它。

@@ -8,6 +8,8 @@ import type {
   BaileysConnectionUpdate,
   BaileysMessage,
   BaileysModule,
+  BaileysRosterEntry,
+  BaileysRosterEvent,
   BaileysSocket,
   SocketEvent,
   WhatsAppSocket,
@@ -23,8 +25,12 @@ interface FakeSocket extends BaileysSocket {
   emitConnection(update: BaileysConnectionUpdate): void
   emitCreds(): void
   emitMessages(messages: readonly BaileysMessage[]): void
+  /** Push one roster batch into the stream the account would publish it on. */
+  emitRoster(stream: BaileysRosterEvent, entries: readonly BaileysRosterEntry[]): void
   readonly sent: { jid: string; text: string; quoted: BaileysMessage | undefined }[]
   readonly read: readonly BaileysMessage['key'][][]
+  /** Every group the binding asked the account about. */
+  readonly metadataAsks: string[]
   ended: boolean
 }
 
@@ -33,12 +39,16 @@ function makeModule(options: {
   ack?: BaileysMessage | undefined
   user?: { id: string } | undefined
   saveCreds?: () => Promise<void>
+  /** What `groupMetadata` answers; a rejection stands for a group the account cannot read. */
+  metadata?: () => Promise<BaileysRosterEntry | null>
 } = {}): { module: BaileysModule; socket: FakeSocket } {
   const connectionListeners: ((update: BaileysConnectionUpdate) => void)[] = []
   const credsListeners: (() => void)[] = []
   const messageListeners: ((batch: { messages: readonly BaileysMessage[] }) => void)[] = []
+  const rosterListeners = new Map<string, ((entries: readonly BaileysRosterEntry[]) => void)[]>()
   const sent: { jid: string; text: string; quoted: BaileysMessage | undefined }[] = []
   const read: BaileysMessage['key'][][] = []
+  const metadataAsks: string[] = []
 
   const socket: FakeSocket = {
     user: 'user' in options ? options.user : { id: '5511888880000:1@s.whatsapp.net' },
@@ -49,6 +59,9 @@ function makeModule(options: {
         if (event === 'messages.upsert') {
           messageListeners.push(listener as (b: { messages: readonly BaileysMessage[] }) => void)
         }
+        const roster = rosterListeners.get(event) ?? []
+        roster.push(listener as (entries: readonly BaileysRosterEntry[]) => void)
+        rosterListeners.set(event, roster)
       },
     },
     sendMessage: (jid, content, opts) => {
@@ -59,14 +72,20 @@ function makeModule(options: {
       read.push([...keys])
       return Promise.resolve()
     },
+    groupMetadata: (jid) => {
+      metadataAsks.push(jid)
+      return (options.metadata ?? (() => Promise.resolve({ id: jid, subject: 'Time' })))()
+    },
     end: () => {
       socket.ended = true
     },
     emitConnection: (update) => { connectionListeners.forEach((listener) => { listener(update) }) },
     emitCreds: () => { credsListeners.forEach((listener) => { listener() }) },
     emitMessages: (messages) => { messageListeners.forEach((listener) => { listener({ messages }) }) },
+    emitRoster: (stream, entries) => { rosterListeners.get(stream)?.forEach((listener) => { listener(entries) }) },
     sent,
     read,
+    metadataAsks,
     ended: false,
   }
 
@@ -360,6 +379,56 @@ describe('sending', () => {
       await expect(port.sendText({ chatId, text: 'oi' }))
         .rejects.toMatchObject({ code: 'WHATSAPP_SEND_UNACKNOWLEDGED' })
     }
+  })
+})
+
+describe('conversation names', () => {
+  it('reports a name from every roster stream the account publishes on', async () => {
+    const { port: _port, socket, events } = await open()
+    socket.emitRoster('chats.upsert', [{ id: chatId, name: 'Ana Lima' }])
+    socket.emitRoster('contacts.update', [{ id: chatId, verifiedName: 'Ana Lima ME' }])
+    socket.emitRoster('groups.update', [{ id: groupId, subject: 'Time' }])
+    expect(events.filter(event => event.kind === 'chat-named')).toEqual([
+      { kind: 'chat-named', chatId, name: 'Ana Lima' },
+      { kind: 'chat-named', chatId, name: 'Ana Lima ME' },
+      { kind: 'chat-named', chatId: groupId, name: 'Time' },
+    ])
+  })
+
+  it('prefers the name the account itself chose over the one the other party picked', async () => {
+    const { socket, events } = await open()
+    socket.emitRoster('contacts.upsert', [{ id: chatId, name: 'Ana (trabalho)', notify: 'aninha' }])
+    expect(events.filter(event => event.kind === 'chat-named')).toEqual([
+      { kind: 'chat-named', chatId, name: 'Ana (trabalho)' },
+    ])
+  })
+
+  it('skips a roster entry that names no conversation', async () => {
+    const { socket, events } = await open()
+    socket.emitRoster('chats.update', [{ id: chatId }, { name: 'nobody' }, { id: chatId, name: '   ' }])
+    expect(events.filter(event => event.kind === 'chat-named')).toEqual([])
+  })
+
+  it('reads a group subject on request', async () => {
+    const { port, socket } = await open()
+    await expect(port.fetchGroupSubject(groupId)).resolves.toBe('Time')
+    expect(socket.metadataAsks).toEqual([groupId])
+  })
+
+  it('does not ask the account about a direct conversation', async () => {
+    const { port, socket } = await open()
+    await expect(port.fetchGroupSubject(chatId)).resolves.toBeUndefined()
+    expect(socket.metadataAsks).toEqual([])
+  })
+
+  it('reports a group whose metadata carries no subject as unnamed', async () => {
+    const { port } = await open({ metadata: () => Promise.resolve(null) })
+    await expect(port.fetchGroupSubject(groupId)).resolves.toBeUndefined()
+  })
+
+  it('surfaces a metadata lookup the account refuses', async () => {
+    const { port } = await open({ metadata: () => Promise.reject(new Error('not a participant')) })
+    await expect(port.fetchGroupSubject(groupId)).rejects.toThrow('not a participant')
   })
 })
 

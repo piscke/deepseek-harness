@@ -29,6 +29,8 @@ export type {
   BaileysLoader,
   BaileysMessage,
   BaileysModule,
+  BaileysRosterEntry,
+  BaileysRosterEvent,
   BaileysSocket,
   BaileysSocketOptions,
   SocketEvent,

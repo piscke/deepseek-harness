@@ -18,16 +18,25 @@
       "path": "../../core/agent"
     },
     {
+      "path": "../../core/agent-default-model"
+    },
+    {
       "path": "../../core/session"
     },
     {
       "path": "../../llm/llm"
     },
     {
+      "path": "../../preset/agent-presets"
+    },
+    {
       "path": "../../session/session-persistence"
     },
     {
       "path": "../../session/session-title"
+    },
+    {
+      "path": "../../settings/settings"
     },
     {
       "path": "../../workspace/workspace"

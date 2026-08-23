@@ -11,16 +11,27 @@
 
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-// Type-only: pulls the shell's SlotMap merge (the 'settings.section' entry).
+// Type-only: pulls the shell's SlotMap merge (the 'settings.section' entry) and
+// the ctx.settingsScope Context merge. Cross-plugin collaboration goes through
+// the service, never a value import (client bundle purity gate).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
+// Type-only: the ctx.remote Context merge carrying forwarded settings invalidation.
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { WhatsAppStatus } from '@deepseek-ai/dsh-whatsapp'
 import { decodeWhatsAppStatus, STATUS_ENDPOINT, WHATSAPP_CHANNEL } from '../channel.ts'
 import { WhatsAppSettingsSection, type WhatsAppSettingsSectionInjected } from './WhatsAppSettingsSection.tsx'
+import { ConversationsController, WHATSAPP_WORKSPACE_NS, type WhatsAppWorkspaceSection } from './conversations.ts'
 import { en, zh, type WhatsAppLocaleKey } from './locales.ts'
 
 export type { WhatsAppSettingsSectionInjected, WhatsAppSettingsSectionProps } from './WhatsAppSettingsSection.tsx'
+export type { ConversationsCardProps } from './ConversationsCard.tsx'
+export type {
+  ConversationsState, WhatsAppChatScope, WhatsAppWorkspaceSection,
+} from './conversations.ts'
+export { ConversationsController, WHATSAPP_WORKSPACE_NS } from './conversations.ts'
+export { ConversationsCard } from './ConversationsCard.tsx'
 export type { WhatsAppLocaleKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -45,7 +56,7 @@ const POLL_INTERVAL_MS = 2_000
 const SECTION_ORDER = 25
 
 /** Required services (cordis fiber inject). */
-export const inject = ['slots', 'locale', 'connection']
+export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
 
 /**
  * Read one status over the pairing channel.
@@ -79,9 +90,13 @@ export function apply(ctx: ClientContext): void {
   // One stable identity: the face is rebuilt per render, and a fresh reader
   // each time would restart the poll on every render.
   const read = (signal: AbortSignal): Promise<WhatsAppStatus> => readStatus(connection, signal)
+  const conversations = new ConversationsController(
+    ctx.settingsScope.bind<WhatsAppWorkspaceSection>({ namespace: WHATSAPP_WORKSPACE_NS }),
+  )
   const injected = (): WhatsAppSettingsSectionInjected => ({
     readStatus: read,
     pollIntervalMs: POLL_INTERVAL_MS,
+    conversations,
   })
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({

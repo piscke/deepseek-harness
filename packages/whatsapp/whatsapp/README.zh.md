@@ -30,9 +30,12 @@ WhatsApp 能力 seam（`ctx.whatsapp`）：在恰好一个已认证账号之上�
 |---|---|
 | `whatsapp/status` | 连接状态发生变化；provider 每次轮换 `pairing` 负载时都会再次发出。 |
 | `whatsapp/message-received` | provider 观察到一条消息，包括账号从其他设备发出的消息（`fromMe`）。 |
+| `whatsapp/chat-named` | 一段对话的显示名变为已知或发生变化。 |
 | `whatsapp/message-sent` | 经由本服务派发的发送获得确认。 |
 
 确认表示 WhatsApp 接受了该消息，而非它已送达或被阅读。重连后回放历史时，provider 可能重复某个 `whatsapp/message-received` id，因此必须只处理一次的消费者要自行保存已处理 id 集合。
+
+对话的名字在消息流之外抵达：群的主题是通过它自己的更新到达连接的，因此群在其首条消息被观察到时通常还没有名字，片刻之后才有。于是 `WhatsAppChat.name` 是一次读数而非固定事实——展示它的界面要跟随 `whatsapp/chat-named` 自我校正。只有 provider 持有的名字确实发生变化时该事件才会发出，因此重连后重新同步同一份名册是静默的。
 
 ## 标识
 

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WhatsAppStatus } from '@deepseek-ai/dsh-whatsapp'
+import { ConversationsCard } from './ConversationsCard.tsx'
+import type { ConversationsController } from './conversations.ts'
 import css from './WhatsAppSettingsSection.module.css'
 
 /** Registration-side face used by the section. */
@@ -13,6 +15,8 @@ export interface WhatsAppSettingsSectionInjected {
   readStatus: (signal: AbortSignal) => Promise<WhatsAppStatus>
   /** Delay between two reads while the section stays mounted. */
   pollIntervalMs: number
+  /** Read, observe, and write which conversations the Workspace answers. */
+  conversations: ConversationsController
 }
 
 /** Full component props assembled by the Settings slot renderer. */
@@ -120,15 +124,17 @@ function StatusShell({ state, title, children }: {
 
 /**
  * Render the WhatsApp connection state and, while the account is pairing, the
- * live QR. The status is re-read on a fixed cadence for as long as the section
- * is mounted: the provider replaces the payload whenever it rotates, and a
- * stale code cannot be scanned.
+ * live QR, followed by the routing choice the Workspace applies to the messages
+ * that account receives. The status is re-read on a fixed cadence for as long
+ * as the section is mounted: the provider replaces the payload whenever it
+ * rotates, and a stale code cannot be scanned.
  * @param props - slot runtime props, the bound translate, and the injected face.
  * @returns the section content.
  */
 export function WhatsAppSettingsSection({
   readStatus,
   pollIntervalMs,
+  conversations,
   t,
 }: WhatsAppSettingsSectionProps): ReactNode {
   const [attempt, setAttempt] = useState(0)
@@ -172,6 +178,7 @@ export function WhatsAppSettingsSection({
         </div>
       ) : null}
       {state.phase === 'ready' ? <StatusCard status={state.status} t={t} /> : null}
+      <ConversationsCard t={t} conversations={conversations} />
     </div>
   )
 }

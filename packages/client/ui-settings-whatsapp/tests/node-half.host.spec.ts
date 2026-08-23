@@ -6,7 +6,16 @@ import type {
   HostConnectionHandle,
 } from '@deepseek-ai/dsh-client-connection'
 import type { WhatsAppStatus } from '@deepseek-ai/dsh-whatsapp'
+import {
+  WHATSAPP_WORKSPACE_SETTINGS_NAMESPACE,
+  WhatsAppWorkspaceSettings,
+} from '@deepseek-ai/dsh-whatsapp-workspace'
 import { apply, decodeWhatsAppStatus, inject, name, STATUS_ENDPOINT, WHATSAPP_CHANNEL } from '../src/index.ts'
+import {
+  WHATSAPP_CHAT_SCOPES,
+  WHATSAPP_CHATS_FIELD,
+  WHATSAPP_WORKSPACE_NS,
+} from '../src/workspace-settings.ts'
 
 interface Registration {
   readonly channel: string
@@ -94,5 +103,17 @@ describe('decodeWhatsAppStatus', () => {
     ['logged-out without a reason', { state: 'logged-out' }],
   ])('rejects %s', (_label, wire) => {
     expect(decodeWhatsAppStatus(wire)).toBeUndefined()
+  })
+})
+
+describe('the Workspace settings section this page edits', () => {
+  it('names the section the Workspace registers', () => {
+    expect(WHATSAPP_WORKSPACE_NS).toBe(WHATSAPP_WORKSPACE_SETTINGS_NAMESPACE)
+    expect(Object.keys(WhatsAppWorkspaceSettings.dict ?? {})).toContain(WHATSAPP_CHATS_FIELD)
+  })
+
+  it('offers every value that field accepts, and no other', () => {
+    const chats = WhatsAppWorkspaceSettings.dict?.[WHATSAPP_CHATS_FIELD]
+    expect(chats?.list?.map((arm): unknown => arm.value)).toEqual([...WHATSAPP_CHAT_SCOPES])
   })
 })
