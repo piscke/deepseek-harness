@@ -15,12 +15,17 @@ const port: WhatsAppSocket = {
 }
 
 /** Compose the collaborators over a mounted seam. */
-async function deps(): Promise<{ ctx: Context; composed: BaileysProviderDeps }> {
+async function deps(): Promise<{ ctx: Context; composed: BaileysProviderDeps; forgotten: number[] }> {
   const ctx = new Context()
   await ctx.plugin(WhatsAppRuntime)
+  const forgotten: number[] = []
   return {
     ctx,
-    composed: providerDeps(ctx, () => Promise.resolve(port), {
+    forgotten,
+    composed: providerDeps(ctx, () => Promise.resolve(port), () => {
+      forgotten.push(1)
+      return Promise.resolve()
+    }, {
       reconnectDelay: 1,
       maxReconnectAttempts: 1,
       historyPerChat: 10,
@@ -95,8 +100,10 @@ describe('provider collaborators', () => {
   })
 
   it('carries the configured behavior through unchanged', async () => {
-    const { composed } = await deps()
+    const { composed, forgotten } = await deps()
     expect(composed.config).toEqual({ reconnectDelay: 1, maxReconnectAttempts: 1, historyPerChat: 10 })
     await expect(composed.open(() => {})).resolves.toBe(port)
+    await composed.forgetPairing()
+    expect(forgotten).toEqual([1])
   })
 })

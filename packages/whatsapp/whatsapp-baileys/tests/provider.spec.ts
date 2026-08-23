@@ -24,6 +24,10 @@ interface Rig {
   readonly pendingTimers: number
   readonly cancelledTimers: number
   readonly opens: number
+  /** How many times the provider discarded the stored pairing. */
+  readonly forgets: number
+  /** Let a held credential discard finish. */
+  releaseForget(): void
   readonly socket: { sent: string[]; read: string[]; closed: boolean; subjectAsks: string[] }
 }
 
@@ -37,6 +41,10 @@ function rig(options: {
   groupSubject?: string
   /** Make every group-subject lookup fail, as an offline or forbidden account would. */
   subjectFails?: boolean
+  /** Fail the credential discard, as an unwritable auth directory would. */
+  forgetFails?: boolean
+  /** Hold the credential discard open until the test releases it. */
+  holdForget?: boolean
 } = {}): Rig {
   const statuses: WhatsAppStatus[] = []
   const messages: WhatsAppMessage[] = []
@@ -47,6 +55,8 @@ function rig(options: {
   const socket = { sent: [] as string[], read: [] as string[], closed: false, subjectAsks: [] as string[] }
   let cancelledTimers = 0
   let opens = 0
+  let forgets = 0
+  let release: () => void = () => {}
   let emit: (event: SocketEvent) => void = () => {}
 
   const port: WhatsAppSocket = {
@@ -77,6 +87,12 @@ function rig(options: {
       const failure = options.openFails?.()
       return failure === undefined ? Promise.resolve(port) : Promise.reject(failure)
     },
+    forgetPairing: () => {
+      forgets += 1
+      if (options.forgetFails === true) return Promise.reject(new Error('auth directory is read-only'))
+      if (options.holdForget !== true) return Promise.resolve()
+      return new Promise<void>((resolve) => { release = resolve })
+    },
     onStatus: status => statuses.push(status),
     onMessage: message => messages.push(message),
     onChatNamed: (id, name) => named.push([id, name]),
@@ -105,6 +121,7 @@ function rig(options: {
     socket,
     emit: (event) => { emit(event) },
     fireTimer: () => timers.shift()?.(),
+    releaseForget: () => { release() },
     get pendingTimers() {
       return timers.length
     },
@@ -113,6 +130,9 @@ function rig(options: {
     },
     get opens() {
       return opens
+    },
+    get forgets() {
+      return forgets
     },
   }
 }
@@ -195,12 +215,37 @@ describe('connection lifecycle', () => {
     expect(() => { scripted.emit({ kind: 'unknown' } as unknown as SocketEvent) }).toThrow()
   })
 
-  it('treats a logged-out close as terminal and stops reconnecting', async () => {
+  it('discards the rejected credentials and reopens so the account can pair again', async () => {
     const scripted = await online()
     scripted.emit({ kind: 'closed', loggedOut: true, reason: 'device removed' })
     expect(scripted.provider.status()).toEqual({ state: 'logged-out', reason: 'device removed' })
-    expect(scripted.provider.available()).toBe(false)
+    await vi.waitFor(() => { expect(scripted.pendingTimers).toBe(1) })
+    expect(scripted.forgets).toBe(1)
+    scripted.fireTimer()
+    await vi.waitFor(() => { expect(scripted.opens).toBe(2) })
+    scripted.emit({ kind: 'pairing', qr: 'QR-1' })
+    expect(scripted.provider.status()).toEqual({ state: 'pairing', qr: 'QR-1' })
+    expect(scripted.provider.available()).toBe(true)
+  })
+
+  it('stops when the rejected credentials cannot be discarded', async () => {
+    const scripted = await online({ forgetFails: true })
+    scripted.emit({ kind: 'closed', loggedOut: true, reason: 'device removed' })
+    await vi.waitFor(() => { expect(scripted.fatals).toHaveLength(1) })
+    expect(scripted.fatals[0]).toMatchObject({ code: 'WHATSAPP_PAIRING_NOT_DISCARDED' })
     expect(scripted.pendingTimers).toBe(0)
+    expect(scripted.provider.available()).toBe(false)
+  })
+
+  it('does not reopen when it is disposed while discarding the rejected credentials', async () => {
+    const scripted = await online({ holdForget: true })
+    scripted.emit({ kind: 'closed', loggedOut: true, reason: 'device removed' })
+    await vi.waitFor(() => { expect(scripted.forgets).toBe(1) })
+    await scripted.provider.dispose()
+    scripted.releaseForget()
+    await new Promise((resolve) => { setTimeout(resolve, 0) })
+    expect(scripted.pendingTimers).toBe(0)
+    expect(scripted.opens).toBe(1)
   })
 })
 

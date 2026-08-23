@@ -14,7 +14,7 @@ The seam is optional, so it ships as a composition rather than as a flag: [`@dee
 
 A WhatsApp account is not a per-request credential: it is a long-lived authenticated connection that a human authorizes once by scanning a QR code, and that WhatsApp can revoke at any time. So `ctx.whatsapp` reports `status()` as part of the capability rather than as a call result, and the provider slot holds exactly one registration — a second one fails with `WHATSAPP_PROVIDER_ALREADY_REGISTERED` instead of choosing between accounts. Running two accounts means two isolated fibers.
 
-`WhatsAppStatus` is a closed union of `offline`, `connecting`, `pairing` (carrying the QR payload a human scans, re-emitted whenever the provider rotates it), `online` (carrying the account id), and `logged-out` (terminal for the current credentials — the account must pair again, and no reconnection can recover it). Every operation except `status()` and `register()` requires `online`: no provider registered fails with `WHATSAPP_PROVIDER_UNAVAILABLE`, any other state with `WHATSAPP_NOT_ONLINE`.
+`WhatsAppStatus` is a closed union of `offline`, `connecting`, `pairing` (carrying the QR payload a human scans, re-emitted whenever the provider rotates it), `online` (carrying the account id), and `logged-out` (terminal for the current credentials — no reconnection over them can succeed, so the account must pair again; a provider may discard them itself and return to `pairing`). Every operation except `status()` and `register()` requires `online`: no provider registered fails with `WHATSAPP_PROVIDER_UNAVAILABLE`, any other state with `WHATSAPP_NOT_ONLINE`.
 
 ## Where a human scans the code
 
@@ -171,7 +171,7 @@ Emitted only when the name the provider holds actually changes, so a reconnectio
 'whatsapp/chat-named'(chatId: WhatsAppChatId, name: string): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:195`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:196`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappmessage-received--emit"></a>
 
@@ -192,7 +192,7 @@ One message was observed in a chat, including messages the connected account sen
 'whatsapp/message-received'(message: WhatsAppMessage): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:181`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:182`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappmessage-sent--emit"></a>
 
@@ -211,7 +211,7 @@ The provider acknowledged one send requested through `ctx.whatsapp`. Acknowledge
 'whatsapp/message-sent'(message: WhatsAppSentMessage): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:203`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:204`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappstatus--emit"></a>
 
@@ -230,5 +230,5 @@ The account's connection state changed, emitted once per transition. A `pairing`
 'whatsapp/status'(status: WhatsAppStatus): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:171`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:172`](../../packages/whatsapp/whatsapp/src/types.ts)
 <!-- END GENERATED cordis-surface -->

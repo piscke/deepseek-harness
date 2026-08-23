@@ -17,12 +17,12 @@ import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-whatsapp'
 import { BaileysProvider } from './provider.ts'
 import { providerDeps } from './deps.ts'
-import { baileysOpener } from './socket.ts'
+import { baileysOpener, pairingForgetter } from './socket.ts'
 
 export { BaileysProvider } from './provider.ts'
 export { providerDeps } from './deps.ts'
 export type { BaileysProviderConfig, BaileysProviderDeps } from './provider.ts'
-export { baileysOpener, loadBaileys } from './socket.ts'
+export { baileysOpener, loadBaileys, pairingForgetter } from './socket.ts'
 export type {
   BaileysConnectionUpdate,
   BaileysKey,
@@ -105,6 +105,7 @@ export function apply(ctx: Context, config: Config): void {
       authDir: resolved.authDir,
       browser: [resolved.deviceName, 'Chrome', '1.0.0'],
     }),
+    pairingForgetter(resolved.authDir),
     {
       reconnectDelay: resolved.reconnectDelay,
       maxReconnectAttempts: resolved.maxReconnectAttempts,

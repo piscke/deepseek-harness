@@ -37,6 +37,8 @@ export interface BaileysProviderConfig {
 export interface BaileysProviderDeps {
   /** Opens one connection; the composition seam that keeps `baileys` out of this module. */
   readonly open: WhatsAppSocketOpener
+  /** Discards the stored pairing, so the next connection asks for a new QR. */
+  readonly forgetPairing: () => Promise<void>
   /** Publishes one status transition. */
   readonly onStatus: (status: WhatsAppStatus) => void
   /** Publishes one observed message. */
@@ -218,8 +220,8 @@ export class BaileysProvider implements WhatsAppProvider {
       case 'closed':
         this.socket = undefined
         if (event.loggedOut) {
-          this.terminal = true
           this.setStatus({ state: 'logged-out', reason: event.reason })
+          void this.repair(event.reason)
           return
         }
         this.setStatus({ state: 'offline' })
@@ -235,6 +237,31 @@ export class BaileysProvider implements WhatsAppProvider {
       default:
         assertNever(event)
     }
+  }
+
+  /**
+   * Discard the credentials WhatsApp rejected and reopen, so unlinking the
+   * device from the phone leads back to a QR instead of to a provider that can
+   * only be revived by deleting `authDir` by hand. A logged-out close means the
+   * stored identity can never authenticate again, so reopening over it would
+   * reproduce the same rejection. The reopen goes through the reconnection
+   * budget, which bounds an account that keeps rejecting a fresh pairing.
+   * @param reason - the close being recovered from, carried into that budget.
+   */
+  private async repair(reason: string): Promise<void> {
+    try {
+      await this.deps.forgetPairing()
+    } catch (cause) {
+      this.fail(new WhatsAppError(
+        `the WhatsApp account was logged out (${reason}) and its credentials could not be discarded, `
+        + 'so pairing again needs the auth directory deleted by hand',
+        'WHATSAPP_PAIRING_NOT_DISCARDED',
+        { cause },
+      ))
+      return
+    }
+    if (this.disposed) return
+    this.retry(new WhatsAppError(reason, 'WHATSAPP_CONNECTION_CLOSED'))
   }
 
   /** Schedule the next attempt, or give up once the budget is spent. */

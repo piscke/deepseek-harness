@@ -13,16 +13,19 @@ import type { WhatsAppSocketOpener } from './socket.ts'
  * Compose the provider's collaborators over one fiber.
  * @param ctx - the fiber that publishes the provider's observations.
  * @param open - opens one connection.
+ * @param forgetPairing - discards the stored pairing after a logged-out close.
  * @param config - the provider's connection-keeping behavior.
  * @returns the collaborators a {@link BaileysProvider} runs on.
  */
 export function providerDeps(
   ctx: Context,
   open: WhatsAppSocketOpener,
+  forgetPairing: () => Promise<void>,
   config: BaileysProviderConfig,
 ): BaileysProviderDeps {
   return {
     open,
+    forgetPairing,
     onStatus: (status) => { ctx.emit('whatsapp/status', status) },
     onMessage: (message) => { ctx.emit('whatsapp/message-received', message) },
     onChatNamed: (chatId, name) => { ctx.emit('whatsapp/chat-named', chatId, name) },

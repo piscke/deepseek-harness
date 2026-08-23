@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { WhatsAppChatId, WhatsAppError, WhatsAppMessageId } from '@deepseek-ai/dsh-whatsapp'
-import { baileysOpener, loadBaileys } from '@deepseek-ai/dsh-whatsapp-baileys'
+import { baileysOpener, loadBaileys, pairingForgetter } from '@deepseek-ai/dsh-whatsapp-baileys'
 import type {
   BaileysConnectionUpdate,
   BaileysMessage,
@@ -181,6 +181,23 @@ describe('stored pairing', () => {
 
   it('connects when the directory holds no credentials yet', async () => {
     await expect(openOver(undefined)).resolves.toBeUndefined()
+  })
+
+  it('discards every auth-state file and keeps whatever else the directory holds', async () => {
+    const authDir = await mkdtemp(join(tmpdir(), 'dsh-whatsapp-'))
+    try {
+      await writeFile(join(authDir, 'creds.json'), '{}')
+      await writeFile(join(authDir, 'pre-key-1.json'), '{}')
+      await writeFile(join(authDir, 'notes.txt'), 'kept')
+      await pairingForgetter(authDir)()
+      await expect(readdir(authDir)).resolves.toEqual(['notes.txt'])
+    } finally {
+      await rm(authDir, { recursive: true, force: true })
+    }
+  })
+
+  it('discards nothing when the auth directory does not exist', async () => {
+    await expect(pairingForgetter(join(tmpdir(), 'dsh-whatsapp-absent'))()).resolves.toBeUndefined()
   })
 })
 

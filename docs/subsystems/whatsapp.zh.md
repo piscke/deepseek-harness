@@ -14,7 +14,7 @@ WhatsApp seam —— 覆盖**一个已认证的个人 WhatsApp 账号**的[能�
 
 WhatsApp 账号不是按请求使用的凭据：它是一条长期存在的已认证连接，由人工扫描一次二维码授权，并且 WhatsApp 随时可以吊销。因此 `ctx.whatsapp` 把 `status()` 作为能力的一部分上报，而非某次调用的结果；provider 槽位也只容纳一次注册 —— 第二次注册失败于 `WHATSAPP_PROVIDER_ALREADY_REGISTERED`，而不是在两个账号之间做选择。运行两个账号意味着两条彼此隔离的 fiber。
 
-`WhatsAppStatus` 是封闭联合：`offline`、`connecting`、`pairing`（携带人工扫描的二维码负载，provider 每次轮换都会重新发出）、`online`（携带账号 id）与 `logged-out`（对当前凭据是终止性的 —— 账号必须重新配对，任何重连都无法恢复）。除 `status()` 与 `register()` 外的每个操作都要求 `online`：未注册 provider 时失败于 `WHATSAPP_PROVIDER_UNAVAILABLE`，其余状态失败于 `WHATSAPP_NOT_ONLINE`。
+`WhatsAppStatus` 是封闭联合：`offline`、`connecting`、`pairing`（携带人工扫描的二维码负载，provider 每次轮换都会重新发出）、`online`（携带账号 id）与 `logged-out`（对当前凭据是终止性的 —— 基于这套凭据的任何重连都不可能成功，账号必须重新配对；provider 可以自行丢弃它们并回到 `pairing`）。除 `status()` 与 `register()` 外的每个操作都要求 `online`：未注册 provider 时失败于 `WHATSAPP_PROVIDER_UNAVAILABLE`，其余状态失败于 `WHATSAPP_NOT_ONLINE`。
 
 ## 人在哪里扫码
 
@@ -171,7 +171,7 @@ Emitted only when the name the provider holds actually changes, so a reconnectio
 'whatsapp/chat-named'(chatId: WhatsAppChatId, name: string): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:195`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:196`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappmessage-received--emit"></a>
 
@@ -192,7 +192,7 @@ One message was observed in a chat, including messages the connected account sen
 'whatsapp/message-received'(message: WhatsAppMessage): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:181`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:182`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappmessage-sent--emit"></a>
 
@@ -211,7 +211,7 @@ The provider acknowledged one send requested through `ctx.whatsapp`. Acknowledge
 'whatsapp/message-sent'(message: WhatsAppSentMessage): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:203`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:204`](../../packages/whatsapp/whatsapp/src/types.ts)
 
 <a id="whatsappstatus--emit"></a>
 
@@ -230,5 +230,5 @@ The account's connection state changed, emitted once per transition. A `pairing`
 'whatsapp/status'(status: WhatsAppStatus): void
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/types.ts:171`](../../packages/whatsapp/whatsapp/src/types.ts)
+Source: [`packages/whatsapp/whatsapp/src/types.ts:172`](../../packages/whatsapp/whatsapp/src/types.ts)
 <!-- END GENERATED cordis-surface -->

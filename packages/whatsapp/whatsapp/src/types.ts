@@ -27,8 +27,9 @@ export type WhatsAppChatKind = 'direct' | 'group'
  * the account, so a surface that displays it decides who can see it.
  * `online` names the account, not the device it connected through, and omits
  * the name rather than inventing one when the provider cannot report it.
- * `logged-out` is terminal for the current credentials: the account must pair
- * again, and no reconnection attempt can recover it.
+ * `logged-out` is terminal for the current credentials: no reconnection over
+ * them can succeed, so the account must pair again. A provider may discard the
+ * rejected credentials itself and return to `pairing`; nothing else recovers it.
  */
 export type WhatsAppStatus =
   | { readonly state: 'offline' }

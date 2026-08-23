@@ -21,11 +21,14 @@ import type {
   WhatsAppSendRequest,
   WhatsAppSentMessage,
 } from '@deepseek-ai/dsh-whatsapp'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
 /** The file `useMultiFileAuthState` keeps the paired identity in. */
 const CREDS_FILE = 'creds.json'
+
+/** Extension of every file `useMultiFileAuthState` writes into `authDir`. */
+const AUTH_STATE_EXTENSION = '.json'
 
 /** Group conversations are the only ones WhatsApp addresses through this domain. */
 const GROUP_JID_SUFFIX = '@g.us'
@@ -243,6 +246,33 @@ export function baileysOpener(
       syncFullHistory: false,
     })
     return bindSocket(socket, saveCreds, baileys.DisconnectReason.loggedOut, onEvent)
+  }
+}
+
+/**
+ * Build the discard that returns one `authDir` to an unpaired directory, so the
+ * next connection asks for a new QR.
+ *
+ * Only the `.json` files `useMultiFileAuthState` writes are removed and the
+ * directory itself is kept: an `authDir` an operator pointed at a directory
+ * holding anything else must not lose it to a credential reset.
+ * @param authDir - directory holding the multi-file auth state.
+ * @returns a function that discards the stored pairing.
+ */
+export function pairingForgetter(authDir: string): () => Promise<void> {
+  return async () => {
+    let entries: readonly string[]
+    try {
+      entries = await readdir(authDir)
+    } catch {
+      // No directory: no pairing is stored, which is the state this asks for.
+      return
+    }
+    await Promise.all(
+      entries
+        .filter(entry => entry.endsWith(AUTH_STATE_EXTENSION))
+        .map(async entry => await rm(join(authDir, entry), { force: true })),
+    )
   }
 }
 
