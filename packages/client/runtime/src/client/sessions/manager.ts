@@ -122,6 +122,18 @@ export class SessionManager {
   private readonly completedNotifications = new Set<SessionId>()
   /** Last-observed running bits per session; the true→false edge here arms {@link completedNotifications}. */
   private readonly prevRunning = new Map<SessionId, boolean>()
+  /**
+   * Sessions holding injected context that arrived while they were not
+   * selected — the sidebar's green "new context" reminder. Producer-agnostic:
+   * the host resolves the `context` placement for every injected message
+   * (an arriving WhatsApp message is the case it exists for), so a session
+   * nobody is watching announces that something is waiting in it.
+   *
+   * Manager-owned so the row lights up for sessions never instantiated;
+   * cleared on select, on session-removed, and on each mux generation's
+   * re-subscribe, whose queue baseline re-arms whatever is still pending.
+   */
+  private readonly pendingContextNotifications = new Set<SessionId>()
   /** Per-session projection value stores, retained independently of instance arrival (the
    *  title-snapshot precedent, generalized): push frames land here whether or not the Session
    *  is instantiated (list rows read the 'title' key), and an instantiated Session adopts the
@@ -197,6 +209,9 @@ export class SessionManager {
     this.selected = sessionId
     // Looking at the session consumes its completion reminder (dot clears).
     this.completedNotifications.delete(sessionId)
+    // Same for context that arrived while it was not being watched: the
+    // pending row is on screen once the session is open.
+    this.pendingContextNotifications.delete(sessionId)
     void this.refreshSubagents(sessionId)
     this.notifier.notifyNow()
   }
@@ -215,6 +230,7 @@ export class SessionManager {
     this.sessions.get(address.childSessionId)?.configureSubagent(address, catalog?.parentAvailable ?? false)
     this.selected = address.childSessionId
     this.completedNotifications.delete(address.childSessionId)
+    this.pendingContextNotifications.delete(address.childSessionId)
     void this.refreshSubagents(address.childSessionId)
     this.notifier.notifyNow()
   }
@@ -672,6 +688,27 @@ export class SessionManager {
     this.notifier.markDirty()
   }
 
+  /**
+   * Re-read one session's context reminder from an authoritative queue
+   * snapshot. The whole live queue arrives on every frame, so the presence of
+   * a `context` row is the entire state: a claimed or cancelled injection
+   * arrives as a frame without one and disarms the dot. The watched session
+   * never arms — its pending rows are already on screen.
+   */
+  private trackPendingContext(
+    sessionId: SessionId,
+    items: Extract<MuxFrame, { type: 'session/queue' }>['items'],
+  ): void {
+    const waiting = sessionId !== this.selected
+      && items.some(item => item.placement === 'context')
+    const changed = waiting
+      ? !this.pendingContextNotifications.has(sessionId)
+      : this.pendingContextNotifications.delete(sessionId)
+    if (!changed) return
+    if (waiting) this.pendingContextNotifications.add(sessionId)
+    this.notifier.markDirty()
+  }
+
   // ---- ConnectionController sinks (wired by boot) ----
 
   /**
@@ -732,6 +769,10 @@ export class SessionManager {
           else this.pendingBuffers.set(frame.sessionId, kept)
         }
       }
+      // The reminder is read off that same snapshot, so it re-baselines with
+      // it: context claimed while this client was disconnected sends no frame,
+      // and the generation's baseline re-arms whatever is still waiting.
+      this.pendingContextNotifications.delete(frame.sessionId)
     }
     // List-level pending-interaction status (the sidebar amber dot): tracked
     // for every session, instantiated or not; stable keys make replays idempotent.
@@ -747,6 +788,8 @@ export class SessionManager {
       )
     } else if (frame.type === 'question/resolved') {
       this.resolvePending(frame.sessionId, `q:${frame.questionRpcId}`)
+    } else if (frame.type === 'session/queue') {
+      this.trackPendingContext(frame.sessionId, frame.items)
     }
     const session = this.sessions.get(frame.sessionId)
     if (session === undefined) {
@@ -829,6 +872,7 @@ export class SessionManager {
         }
         this.pendingBuffers.delete(frame.sessionId) // a removed session's buffered frames must not replay on a future instantiation
         this.pendingInteractions.delete(frame.sessionId) // a removed session cannot wait on anyone
+        this.pendingContextNotifications.delete(frame.sessionId) // nor hold context for anyone to read
         // Owner disposal already dropped these registry-side, but that lands on
         // the mux stream while this frame rides the host stream, so the two have
         // no relative order. Clearing here makes a detached Activation's rows
@@ -991,7 +1035,8 @@ export class SessionManager {
    * consecutive status frames into one observation). A running→idle edge of a
    * non-selected session arms its reminder; running disarms it; removal drops
    * it. First observation only records the running bit — sessions already
-   * idle at load get no reminder.
+   * idle at load get no reminder. The same pass drops both reminder sets'
+   * entries for sessions the list no longer carries.
    */
   private syncCompletedNotifications(): void {
     const seen = new Set<SessionId>()
@@ -1014,6 +1059,9 @@ export class SessionManager {
     }
     for (const id of this.completedNotifications) {
       if (!seen.has(id)) this.completedNotifications.delete(id)
+    }
+    for (const id of this.pendingContextNotifications) {
+      if (!seen.has(id)) this.pendingContextNotifications.delete(id)
     }
   }
 
@@ -1038,7 +1086,9 @@ export class SessionManager {
       const status = statuses.find(candidate => candidate !== 'approval') ?? statuses[0]
       if (status !== undefined) pendingInteractions.set(sessionId, status)
     }
-    const fresh = flattenLineage(merged, pendingInteractions, this.completedNotifications)
+    const fresh = flattenLineage(
+      merged, pendingInteractions, this.completedNotifications, this.pendingContextNotifications,
+    )
     const items = fresh.map((entry) => {
       const prev = this.entryCache.get(entry.sessionId)
       if (
@@ -1049,6 +1099,7 @@ export class SessionManager {
         && prev.pendingInteraction === entry.pendingInteraction
         && prev.projectionValues === entry.projectionValues
         && prev.completed === entry.completed
+        && prev.pendingContext === entry.pendingContext
       ) return prev
       this.entryCache.set(entry.sessionId, entry)
       return entry

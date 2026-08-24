@@ -108,6 +108,20 @@ describe('deriveGroups', () => {
     expect(search.items[0]?.completed).toBe(true)
   })
 
+  it('projects the pending-context reminder into session and search rows (absent = false)', () => {
+    const waiting = { ...summary('waiting', 3), pendingContext: true }
+    const plain = summary('plain', 2)
+    const sessions = list(waiting, plain)
+    const groups = deriveGroups(
+      sessions, [workspace('first', ['waiting', 'plain'])], noArchive, view(['first']),
+    )
+    expect(groups[0]!.sessions.find(session => session.id === waiting.id)!.pendingContext).toBe(true)
+    expect(groups[0]!.sessions.find(session => session.id === plain.id)!.pendingContext).toBe(false)
+    expect(deriveFlat(sessions, noArchive).find(node => node.id === waiting.id)!.pendingContext).toBe(true)
+    const search = deriveSearchResults(sessions, [workspace('first', ['waiting', 'plain'])], 'waiting', noArchive, { items: [], hasMore: false }, 10)
+    expect(search.items[0]?.pendingContext).toBe(true)
+  })
+
   it('hides subagent-origin sessions without hiding ordinary forks', () => {
     const parent = summary('parent', 1)
     const subagent = {
@@ -309,6 +323,7 @@ describe('deriveSearchResults', () => {
           runningSubagentCount: 0,
           pendingInteraction: 'plan-review',
           completed: false,
+          pendingContext: false,
           snippet: 'title session body excerpt',
         },
         {
@@ -318,6 +333,7 @@ describe('deriveSearchResults', () => {
           running: false,
           runningSubagentCount: 0,
           completed: false,
+          pendingContext: false,
         },
         {
           id: contentHit.id,
@@ -326,6 +342,7 @@ describe('deriveSearchResults', () => {
           running: false,
           runningSubagentCount: 0,
           completed: false,
+          pendingContext: false,
           snippet: 'body needle excerpt',
         },
       ],

@@ -59,4 +59,13 @@ describe('flattenLineage', () => {
     expect(out.find(e => e.sessionId === 'b')?.completed).toBe(true)
     expect(flattenLineage([s('a', 10)])[0]?.completed).toBe(false)
   })
+
+  it('projects the pending-context set into rows (absent = false)', () => {
+    const out = flattenLineage(
+      [s('a', 10), s('b', 20)], undefined, undefined, new Set(['b' as SessionId]),
+    )
+    expect(out.find(e => e.sessionId === 'a')?.pendingContext).toBe(false)
+    expect(out.find(e => e.sessionId === 'b')?.pendingContext).toBe(true)
+    expect(flattenLineage([s('a', 10)])[0]?.pendingContext).toBe(false)
+  })
 })

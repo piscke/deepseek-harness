@@ -1152,6 +1152,96 @@ describe('completed reminder', () => {
   })
 })
 
+describe('pending-context reminder', () => {
+  const added = (rpcId: string, sessionId: SessionId) => ({
+    rpcId: rpcId as never,
+    payload: { type: 'host/session-added' as const, sessionId, blank: false },
+  })
+  const queue = (sessionId: SessionId, placements: readonly ('queued' | 'steering' | 'context')[]) => ({
+    rpcId: 'qf' as never,
+    payload: {
+      type: 'session/queue',
+      sessionId,
+      items: placements.map((placement, index) => ({
+        id: `m${index}`,
+        placement,
+        message: { id: `m${index}`, role: 'user', content: [], source: { kind: 'plugin', plugin: 'whatsapp-workspace' } },
+      })),
+    } as never,
+  })
+  const entry = (manager: SessionManager, sessionId: SessionId) =>
+    manager.getListSnapshot().items.find(item => item.sessionId === sessionId)
+
+  it('arms on injected context in an unwatched session and clears on select', () => {
+    const manager = new SessionManager(new FakeApiClient(), fakeRemote())
+    manager.handleHostEnvelope(added('h1', S1))
+    manager.handleHostEnvelope(added('h2', S2))
+    manager.select(S1)
+    expect(entry(manager, S2)?.pendingContext).toBe(false)
+    manager.handleMuxEnvelope(queue(S2, ['context']))
+    expect(entry(manager, S2)?.pendingContext).toBe(true)
+    // A repeated snapshot of the same waiting context is not a new fact.
+    manager.handleMuxEnvelope(queue(S2, ['context']))
+    expect(entry(manager, S2)?.pendingContext).toBe(true)
+    manager.select(S2)
+    expect(entry(manager, S2)?.pendingContext).toBe(false)
+  })
+
+  it('never arms for the watched session or for queued and steering placements alone', () => {
+    const manager = new SessionManager(new FakeApiClient(), fakeRemote())
+    manager.handleHostEnvelope(added('h1', S1))
+    manager.handleHostEnvelope(added('h2', S2))
+    manager.select(S1)
+    manager.handleMuxEnvelope(queue(S1, ['context']))
+    expect(entry(manager, S1)?.pendingContext).toBe(false)
+    manager.handleMuxEnvelope(queue(S2, ['queued', 'steering']))
+    expect(entry(manager, S2)?.pendingContext).toBe(false)
+  })
+
+  it('disarms when the claiming snapshot no longer carries the context row', () => {
+    const manager = new SessionManager(new FakeApiClient(), fakeRemote())
+    manager.handleHostEnvelope(added('h1', S1))
+    manager.handleHostEnvelope(added('h2', S2))
+    manager.select(S1)
+    manager.handleMuxEnvelope(queue(S2, ['context']))
+    manager.handleMuxEnvelope(queue(S2, []))
+    expect(entry(manager, S2)?.pendingContext).toBe(false)
+  })
+
+  it('re-baselines on re-subscribe and drops the reminder with the session', () => {
+    const manager = new SessionManager(new FakeApiClient(), fakeRemote())
+    manager.handleHostEnvelope(added('h1', S1))
+    manager.handleHostEnvelope(added('h2', S2))
+    manager.select(S1)
+    manager.handleMuxEnvelope(queue(S2, ['context']))
+    manager.handleMuxEnvelope({
+      rpcId: 's' as never,
+      payload: { type: 'session/subscribed', sessionId: S2, lastSeq: 3 },
+    })
+    expect(entry(manager, S2)?.pendingContext).toBe(false)
+    // The generation's own baseline re-arms what is still waiting.
+    manager.handleMuxEnvelope(queue(S2, ['context']))
+    expect(entry(manager, S2)?.pendingContext).toBe(true)
+    manager.handleHostEnvelope({ rpcId: 'rm' as never, payload: { type: 'host/session-removed', sessionId: S2 } })
+    manager.handleHostEnvelope(added('h3', S2))
+    expect(entry(manager, S2)?.pendingContext).toBe(false)
+  })
+
+  it('sweeps a reminder whose session left the list', async () => {
+    const api = new FakeApiClient()
+    api.onList = () => Promise.resolve(ok({ items: [summary(S1), summary(S2)] as never[] }))
+    const manager = new SessionManager(api, fakeRemote())
+    await manager.refreshList()
+    manager.select(S1)
+    manager.handleMuxEnvelope(queue(S2, ['context']))
+    expect(entry(manager, S2)?.pendingContext).toBe(true)
+    api.onList = () => Promise.resolve(ok({ items: [summary(S1)] as never[] }))
+    await manager.refreshList()
+    manager.handleHostEnvelope({ rpcId: 'h9' as never, payload: { type: 'host/session-added', sessionId: S2, blank: false } })
+    expect(entry(manager, S2)?.pendingContext).toBe(false)
+  })
+})
+
 describe('background-job mirror', () => {
   const view = (over: Partial<{ id: string; status: string; label: string }> = {}) => ({
     id: 'bash-1', kind: 'bash', label: 'pnpm run build', status: 'running', startedAt: 5, ...over,
