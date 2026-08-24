@@ -44,7 +44,7 @@ seam 不拥有任何消息数据库。`listChats` 与 `fetchMessages` 返回已�
 
 入站投递永不打断，而且默认也永不开启一个轮次。轮次中途到达的消息会等待，通过维护路径认领 agent 的空闲阶段；在那里它作为待处理上下文被注入，显示在对话末尾并一直保留，直到操作者的下一条提示把它带入那次请求，且位于提示本身之前。面前没有操作者仍要作答的部署设置 `inboundDelivery: turn`，改为每条消息一个后续轮次。「模型可见 ⟺ 已记录」在失败方向上成立 —— `whatsapp/inbound` 在两种投递之前都会先追加，因此日志拒绝的消息永远不会到达模型，而其后的队列继续前进。
 
-部署唯一永不路由的，是账号自己的消息。`fromMe` 既涵盖操作者在手机上打字，也涵盖 harness 自己被回送的回答；投递其中任何一种，都会用 agent 已经掌握的话唤醒它。seam 发布的其他一切都是某个人发出的，因此路由不需要任何别的内容判断。
+部署唯一永不路由的，是自己回传的那条回答。`fromMe` 同时涵盖两位发送者，因此 seam 记录下自己派发的每一次发送，router 在任何策略生效之前认领那条回声；投递它会用 agent 已经掌握的话唤醒它。操作者在已配对手机上打字则与其他消息一样被路由，这正是一个账号触达自己 harness 的方式，也是无需第二个号码即可试用部署的方式。seam 发布的其他一切都是某个人发出的，因此路由不需要任何别的内容判断。
 
 ## 回复是逐条做出的决定
 
@@ -76,6 +76,8 @@ Every operation resolves the provider at call time and rejects when the capabili
 - a registered provider whose account is not `online` → `WHATSAPP_NOT_ONLINE`.
 
 The provider emits `whatsapp/status` and `whatsapp/message-received`; this service emits `whatsapp/message-sent` after a send it dispatched is acknowledged, so an outbound acknowledgement exists even for a provider that observes no echo of its own traffic.
+
+It also remembers what it dispatched, so `claimOwnEcho` can tell the deployment's own answer coming back apart from the account writing from its paired phone.
 
 ```ts cordis-catalog
 /**
@@ -111,11 +113,34 @@ async fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Prom
 /**
  * Send one text message and announce the acknowledgement on
  * `whatsapp/message-sent`. A rejected send emits nothing.
+ *
+ * The body is recorded as claimable before the provider is asked, because a
+ * provider that republishes the account's own traffic can publish this send's
+ * echo before this call returns; a record written afterwards would arrive
+ * behind the consumer that already routed it. The record survives a rejected
+ * send, since a send can fail after WhatsApp already relayed it.
  * @param request - the target chat, the non-empty body, and an optional quoted message.
  * @param signal - optional cancellation signal forwarded to the provider.
  * @returns the acknowledged message identity and send time.
  */
 async send(request: WhatsAppSendRequest, signal?: AbortSignal): Promise<WhatsAppSentMessage>
+
+/**
+ * Claim one observed message as the echo of a send this service dispatched.
+ *
+ * A provider republishes the account's own traffic, so a consumer that acts
+ * on what the account writes — the operator typing from the paired phone —
+ * has to drop the deployment's own answers coming back, which would otherwise
+ * wake the agent with its own words. A message the account did not write, and
+ * a body no dispatched send carries, are never claimed.
+ *
+ * The claim is consumed: the first message matching a dispatched send answers
+ * `true`, and an identical message after it is the account writing that text
+ * itself.
+ * @param message - the observed message, as the provider normalized it.
+ * @returns whether this message is a send this service dispatched.
+ */
+claimOwnEcho(message: WhatsAppMessage): boolean
 
 /**
  * Resolve one conversation address into the conversation it names.
@@ -140,7 +165,7 @@ async resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAp
 async markRead(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<void>
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/index.ts:62`](../../packages/whatsapp/whatsapp/src/index.ts)
+Source: [`packages/whatsapp/whatsapp/src/index.ts:79`](../../packages/whatsapp/whatsapp/src/index.ts)
 
 <a id="whatsapp-events"></a>
 

@@ -88,8 +88,8 @@ describe('routing', () => {
     expect(chatTitle(message({}, ['chatName']))).toBe(anaId)
   })
 
-  it('never routes a message the account itself wrote', () => {
-    expect(routeMessage(config(), message({ fromMe: true }))).toBeUndefined()
+  it('routes what the account itself wrote, because that is the operator on the paired phone', () => {
+    expect(routeMessage(config(), message({ fromMe: true }))).toBe(chatSessionId(anaId))
   })
 
   it.each(['imageMessage', 'senderKeyDistributionMessage', 'messageContextInfo', 'protocolMessage'])(

@@ -45,17 +45,22 @@ export class WhatsAppInboundRouter {
   }
 
   /**
-   * Route one observed message. Filtered conversations, the account's own
-   * messages, and ids already delivered end here; everything else is queued
-   * against its conversation's session, opening that session on first use. A
-   * conversation the operator archived is restored to the sidebar as its
+   * Route one observed message. The deployment's own answers coming back,
+   * filtered conversations, and ids already delivered end here; everything else
+   * is queued against its conversation's session, opening that session on first
+   * use. A conversation the operator archived is restored to the sidebar as its
    * message is routed.
+   *
+   * The echo claim runs before the routing policy, so a send into a
+   * conversation this deployment does not route still consumes its record
+   * rather than leaving it to match a later message.
    *
    * A message that arrives while this router is being disposed is dropped by
    * the target queue, which stops accepting before its drain is awaited.
    * @param message - the observed message, as the seam normalized it.
    */
   accept(message: WhatsAppMessage): void {
+    if (this.ctx.whatsapp.claimOwnEcho(message)) return
     const config = this.policy()
     const sessionId = routeMessage(config, message)
     if (sessionId === undefined) return

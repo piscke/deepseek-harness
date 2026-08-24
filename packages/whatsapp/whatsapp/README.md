@@ -16,6 +16,7 @@ This is the **definition** package. It owns the vocabulary, the events, and the 
 | `resolveChat(chatId, signal?)` | The conversation one address names, kind decided by the provider and named when the connection observed it. Rejects a value that names no conversation with `WHATSAPP_UNKNOWN_CHAT`. |
 | `fetchMessages(request, signal?)` | One page of a chat's history, newest first; an address the connection never observed has no retained history and answers with an empty page. |
 | `send(request, signal?)` | Sends one text message and emits `whatsapp/message-sent` once acknowledged. |
+| `claimOwnEcho(message)` | Whether one observed message is a send this service dispatched, consuming the claim. |
 | `markRead(chatId, signal?)` | Marks a chat read up to its newest message. |
 
 An account is one long-lived connection, so status belongs to the capability rather than to a call result. Every operation except `status()` and `register()` requires the account to be `online`: no registered provider fails with `WHATSAPP_PROVIDER_UNAVAILABLE`, and a provider whose account is connecting, pairing, or logged out fails with `WHATSAPP_NOT_ONLINE`.
@@ -37,6 +38,14 @@ Acknowledgement means WhatsApp accepted the message, not that it was delivered o
 
 A conversation's name arrives outside the message stream: a group's subject reaches the connection through its own update, so a group is routinely unnamed when its first message is observed and named moments later. `WhatsAppChat.name` is therefore a reading, not a fixed fact — a surface that displays it follows `whatsapp/chat-named` and corrects itself. The event fires only when the name the provider holds actually changes, so a reconnection that re-syncs the same roster is silent.
 
+## Telling the account apart from this deployment
+
+A provider republishes the account's own traffic, so `fromMe` covers two different things at once: the operator writing from the paired phone, and this deployment's own answer coming back. A consumer that acts on what the account writes has to drop the second, or the agent is woken by its own words.
+
+`claimOwnEcho` is what separates them. `send` records the conversation and the exact body before the provider is asked, because a provider can publish the echo before its `send` returns — a record written on the acknowledgement would arrive behind the consumer that already routed it. The record survives a rejected send, since a send can fail after WhatsApp already relayed it, and the claim is consumed, so the same body observed again is the account writing it itself.
+
+`OUTBOUND_ECHO_RECALL` sends stay claimable at once. It is the depth of the mechanism, not a deployment choice: it only has to exceed the sends whose echo has not been observed yet.
+
 ## Identity
 
 `WhatsAppChatId` and `WhatsAppMessageId` are branded strings: a chat id is the account-visible conversation address, a message id is opaque and only meaningful to the connection that observed it.
@@ -54,5 +63,6 @@ No direct invalidation; the consumer owns any request-prefix changes.
 ## Known Limitations and Deferred Work
 
 - **Text only** — `send` carries text, and a provider reports media it cannot represent as `unsupported` with its media type rather than dropping the message. Sending or reading media is deferred work.
+- **An echo is claimed by its body** — a dispatched send is matched by conversation and exact text, because its message id exists only on the acknowledgement, which a provider can publish the echo ahead of. So the account writing, into the same conversation, the exact text this deployment just sent there is claimed as that echo; and a provider that publishes no echo of its own traffic leaves records to be evicted by the sends that follow.
 - **One account per seam** — the provider slot holds exactly one registration, because a registration owns a specific authenticated account. Running two accounts means two isolated fibers.
 - **No delivery or read state** — the seam reports what was sent and observed, not per-recipient delivery, read receipts, or typing presence.

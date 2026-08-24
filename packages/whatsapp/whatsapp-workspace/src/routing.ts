@@ -63,17 +63,20 @@ export function isRoutedChat(config: ResolvedConfig, chatId: string, chatKind: W
  * id and one contact's history never mixes with another's.
  *
  * A message the connected account wrote (`fromMe`, including from another
- * device) is never routed: it is the echo of an answer the deployment already
- * produced, and delivering it back would wake the agent with its own words.
- * Nothing else is filtered by content — `whatsapp/message-received` means a
- * person sent something, and a provider that cannot honor that drops the frame
- * rather than publishing it.
+ * device) is routed like any other: it is the operator writing from the paired
+ * phone, which is how an account talks to its own harness. What must not be
+ * routed is the deployment's own answer coming back, and that is decided by
+ * `ctx.whatsapp.claimOwnEcho` before this function is reached, not by the
+ * author of the message.
+ *
+ * Nothing is filtered by content — `whatsapp/message-received` means a person
+ * sent something, and a provider that cannot honor that drops the frame rather
+ * than publishing it.
  * @param config - the resolved routing policy.
  * @param message - the observed message, as the seam normalized it.
  * @returns the session that conversation owns, or `undefined` when the message is not routed.
  */
 export function routeMessage(config: ResolvedConfig, message: WhatsAppMessage): SessionId | undefined {
-  if (message.fromMe) return undefined
   if (!isRoutedChat(config, message.chatId, message.chatKind)) return undefined
   return chatSessionId(message.chatId)
 }

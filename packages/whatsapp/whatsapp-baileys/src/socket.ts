@@ -271,7 +271,9 @@ export function pairingForgetter(authDir: string): () => Promise<void> {
     await Promise.all(
       entries
         .filter(entry => entry.endsWith(AUTH_STATE_EXTENSION))
-        .map(async entry => await rm(join(authDir, entry), { force: true })),
+        .map(async (entry) => {
+          await rm(join(authDir, entry), { force: true })
+        }),
     )
   }
 }
