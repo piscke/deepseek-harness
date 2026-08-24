@@ -2305,6 +2305,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'resolution after durability.',
       },
       {
+        signature: 'unarchiveSession(sessionId: SessionId): Promise<void>',
+        description: 'Remove one session from the archive set durably, restoring it to every grouping surface in the accounting slot it never lost. An id absent from the set resolves without writing, so a caller may clear unconditionally.\n\nUnlike archiving, this accepts a session neither live nor persisted: the set entry exists independently of the log, and refusing to remove it would strand a hidden id no surface can reach.',
+        parameters: [{ name: 'sessionId', description: 'The session to restore.' }],
+        returns: 'resolution after durability.',
+      },
+      {
         signature: 'async resolveByPath(path: string): Promise<Workspace | undefined>',
         description: 'Resolve by canonical directory path without creating or mutating a workspace. A missing path rejects during `realpath`; an existing unowned directory returns `undefined`.',
         parameters: [{ name: 'path', description: 'Existing directory path in any spelling.' }],

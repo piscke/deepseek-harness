@@ -213,6 +213,19 @@ insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly Workspac
 archiveSession(sessionId: SessionId): Promise<void>
 
 /**
+ * Remove one session from the archive set durably, restoring it to every
+ * grouping surface in the accounting slot it never lost. An id absent from
+ * the set resolves without writing, so a caller may clear unconditionally.
+ *
+ * Unlike archiving, this accepts a session neither live nor persisted: the
+ * set entry exists independently of the log, and refusing to remove it would
+ * strand a hidden id no surface can reach.
+ * @param sessionId - The session to restore.
+ * @returns resolution after durability.
+ */
+unarchiveSession(sessionId: SessionId): Promise<void>
+
+/**
  * Resolve by canonical directory path without creating or mutating a
  * workspace. A missing path rejects during `realpath`; an existing unowned
  * directory returns `undefined`.

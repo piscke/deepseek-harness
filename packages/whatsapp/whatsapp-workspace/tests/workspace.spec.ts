@@ -143,7 +143,8 @@ async function harness(options: HarnessOptions = {}) {
   await ctx.plugin(AgentDefaultModel, { provider: 'stub-provider', model: 'stub-model' })
   await ctx.plugin(SessionTitle, { fallbackMaxWords: 8, fallbackMaxBytes: 120, maxTitleBytes: 200 })
   await ctx.plugin(Storage)
-  ctx.storage.backend.register('memory', new MemoryStorageBackend())
+  const backend = new MemoryStorageBackend()
+  ctx.storage.backend.register('memory', backend)
   const storageDomain = new DomainFacility(ctx, { backend: 'memory', routes: {} })
   ctx.storage.mount('domain', storageDomain)
   ctx.provide('storageDomain', storageDomain)
@@ -210,7 +211,7 @@ async function harness(options: HarnessOptions = {}) {
 
   const directory = options.directory?.(root) ?? root
   const fiber = await ctx.plugin(workspacePlugin, { directory, ...options.config })
-  return { ctx, root, fiber, agents, warnings, mounted, open, selections }
+  return { ctx, root, fiber, agents, warnings, mounted, open, selections, pool: backend.pool }
 }
 
 /** Let the router's opening (which touches the filesystem) and delivery settle. */
@@ -265,6 +266,41 @@ describe('the WhatsApp Workspace', () => {
 
     expect(agents.size).toBe(1)
     expect(agents.get(chatSessionId(anaId))?.logged()).toEqual(['M1', 'M2'])
+  })
+
+  it('restores an archived conversation to the sidebar when it speaks again', async () => {
+    const { ctx, agents } = await harness()
+    const sessionId = chatSessionId(anaId)
+
+    ctx.emit('whatsapp/message-received', message('M1'))
+    await settle()
+    await ctx.workspaceRegistry.archiveSession(sessionId)
+    expect(ctx.workspaceRegistry.archivedSessionIds).toEqual([sessionId])
+
+    ctx.emit('whatsapp/message-received', message('M2'))
+    await settle()
+
+    // The agent answers a hidden conversation either way, so the row comes back.
+    expect(ctx.workspaceRegistry.archivedSessionIds).toEqual([])
+    expect(agents.get(sessionId)?.logged()).toEqual(['M1', 'M2'])
+  })
+
+  it('warns and still delivers when the archive set cannot be written', async () => {
+    const { ctx, agents, warnings, pool } = await harness()
+    const sessionId = chatSessionId(anaId)
+
+    ctx.emit('whatsapp/message-received', message('M1'))
+    await settle()
+    await ctx.workspaceRegistry.archiveSession(sessionId)
+    pool.failNextWrites = 1
+
+    ctx.emit('whatsapp/message-received', message('M2'))
+    await settle()
+
+    expect(warnings.some(text => text.includes(`could not unarchive session "${sessionId}"`))).toBe(true)
+    // Delivery never waits on the display write, so the message still lands.
+    expect(agents.get(sessionId)?.logged()).toEqual(['M1', 'M2'])
+    expect(ctx.workspaceRegistry.archivedSessionIds).toEqual([sessionId])
   })
 
   it('answers only the conversation kinds the scope names', async () => {
