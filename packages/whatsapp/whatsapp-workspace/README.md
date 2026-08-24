@@ -31,7 +31,9 @@ One conversation is one session, always. A contact and a group each get their ow
 
 `allowChatIds`, when non-empty, is exhaustive; `denyChatIds` is applied afterwards, so a chat named by both stays denied. Both are judged after `chats`, so narrowing the scope never leaves a conversation routed by an allowlist entry the operator forgot.
 
-Two filters are policy the deployment cannot turn off. A message the account itself wrote (`fromMe`, including from another device) is never routed, because delivering the deployment's own answer back would wake the agent with its own words. A message id already delivered is dropped, because a provider replays history after a reconnection.
+Two filters are policy the deployment cannot turn off. The deployment's own answer coming back is never routed — `ctx.whatsapp.claimOwnEcho` recognizes it before the policy is consulted — because delivering it would wake the agent with its own words. A message id already delivered is dropped, because a provider replays history after a reconnection.
+
+What the account itself wrote is otherwise routed like anything else. `fromMe` is the operator writing from the paired phone, which is how an account talks to its own harness and how a deployment is tried out without a second number; only the harness's own sends are the echo, and those are the ones claimed.
 
 Nothing is filtered by content. `whatsapp/message-received` means a person sent something — a provider drops delivery metadata and protocol housekeeping instead of publishing it — so this package never inspects WhatsApp field names, and a media type it cannot render still enters the session.
 
@@ -167,6 +169,7 @@ Append-only; each framing follows the reusable request prefix and does not inval
 - **Cancelling a conversation discards what never reached the model** — `agent.cancel()` clears pending inbox work, so messages waiting under `context` are dropped from the request they would have ridden. The durable `whatsapp/inbound` records still hold them.
 - **Pending context accumulates without a cap** — with no automatic turn, a busy conversation keeps injecting until the operator writes, and every waiting message rides that one request. `chats`, `allowChatIds`, and `denyChatIds` are the controls; a per-conversation cap is deferred.
 - **Deduplication is in-memory** — `seenMessageLimit` ids live with the plugin, so a restart can redeliver a message the provider replays. The durable `whatsapp/inbound` log knows better; consulting it at load is deferred.
+- **An echo outlives no restart** — the claimable sends live with the seam, so an echo the provider replays after a restart is routed as what the account wrote, and the conversation reads its own last answer back.
 - **The agent's reply is not sent anywhere** — this package delivers messages into a session. Whether the agent answers, and to whom, is the model's decision through `whatsapp_send_message`, which asks the operator every time. There is no auto-reply path, by design.
 - **Sessions open without bound** — one session per conversation, created on first contact, with no eviction and no cap. `chats`, `allowChatIds`, and `denyChatIds` are the controls an account with many conversations has.
 - **Sessions from an earlier standing-session layout are no longer routed** — a deployment that ran the removed `category` or `single` shapes keeps those logs attached to the Workspace and readable, and new messages open per-conversation sessions beside them. Nothing is migrated and nothing is deleted.

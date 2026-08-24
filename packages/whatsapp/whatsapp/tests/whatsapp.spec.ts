@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import WhatsAppRuntime, {
+  OUTBOUND_ECHO_RECALL,
   WhatsAppChatId,
   WhatsAppError,
   WhatsAppMessageId,
@@ -190,6 +191,79 @@ describe('WhatsAppRuntime send', () => {
       expect.objectContaining({ code: 'WHATSAPP_EMPTY_MESSAGE' }),
     )
     expect(send).not.toHaveBeenCalled()
+  })
+})
+
+describe('WhatsAppRuntime own-echo claims', () => {
+  /** An observed message as a provider republishes the account's own traffic. */
+  function echo(text: string, overrides: Partial<WhatsAppMessage> = {}): WhatsAppMessage {
+    return { ...message(), fromMe: true, content: { kind: 'text', text }, ...overrides }
+  }
+
+  it('claims the echo of a dispatched send once, then treats an identical body as the account writing', async () => {
+    const { whatsapp } = await mount()
+    whatsapp.register(makeProvider())
+
+    await whatsapp.send({ chatId, text: 'combinado' })
+
+    expect(whatsapp.claimOwnEcho(echo('combinado'))).toBe(true)
+    expect(whatsapp.claimOwnEcho(echo('combinado'))).toBe(false)
+  })
+
+  it('claims an echo published before the provider acknowledged the send', async () => {
+    const { ctx, whatsapp } = await mount()
+    const claimed: boolean[] = []
+    whatsapp.register(makeProvider({
+      send: () => {
+        // A provider republishes its own traffic from inside the dispatch, so
+        // the record has to exist before this point.
+        claimed.push(ctx.whatsapp.claimOwnEcho(echo('combinado')))
+        return Promise.resolve(sent())
+      },
+    }))
+
+    await whatsapp.send({ chatId, text: 'combinado' })
+
+    expect(claimed).toEqual([true])
+  })
+
+  it('keeps the record when the send rejects, because a send can fail after WhatsApp relayed it', async () => {
+    const { whatsapp } = await mount()
+    whatsapp.register(makeProvider({
+      send: () => Promise.reject(new WhatsAppError('timed out', 'WHATSAPP_TIMEOUT')),
+    }))
+
+    await expect(whatsapp.send({ chatId, text: 'combinado' })).rejects.toThrow(WhatsAppError)
+
+    expect(whatsapp.claimOwnEcho(echo('combinado'))).toBe(true)
+  })
+
+  it('claims nothing the deployment did not dispatch', async () => {
+    const { whatsapp } = await mount()
+    whatsapp.register(makeProvider())
+    await whatsapp.send({ chatId, text: 'combinado' })
+    const otherChat = WhatsAppChatId('12036300000@g.us')
+
+    // The account writing from its phone, a different conversation, and media
+    // this seam cannot send are all the account's own traffic, none of it ours.
+    expect(whatsapp.claimOwnEcho(echo('bom dia'))).toBe(false)
+    expect(whatsapp.claimOwnEcho(echo('combinado', { chatId: otherChat }))).toBe(false)
+    expect(whatsapp.claimOwnEcho(echo('combinado', { content: { kind: 'unsupported', mediaType: 'image' } })))
+      .toBe(false)
+    expect(whatsapp.claimOwnEcho({ ...echo('combinado'), fromMe: false })).toBe(false)
+  })
+
+  it('forgets the oldest dispatched send past the recall depth', async () => {
+    const { whatsapp } = await mount()
+    whatsapp.register(makeProvider())
+
+    await whatsapp.send({ chatId, text: 'oldest' })
+    for (let index = 0; index < OUTBOUND_ECHO_RECALL; index += 1) {
+      await whatsapp.send({ chatId, text: `filler ${index}` })
+    }
+
+    expect(whatsapp.claimOwnEcho(echo('oldest'))).toBe(false)
+    expect(whatsapp.claimOwnEcho(echo('filler 0'))).toBe(true)
   })
 })
 

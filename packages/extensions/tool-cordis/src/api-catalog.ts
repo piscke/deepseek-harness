@@ -2205,7 +2205,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'whatsapp',
     summary: 'The WhatsApp access service.',
-    description: 'The WhatsApp access service. Registered as `ctx.whatsapp` (one instance per context).\n\nEvery operation resolves the provider at call time and rejects when the capability cannot run:\n\n- no provider registered → `WHATSAPP_PROVIDER_UNAVAILABLE`.\n- a registered provider whose account is not `online` → `WHATSAPP_NOT_ONLINE`.\n\nThe provider emits `whatsapp/status` and `whatsapp/message-received`; this service emits `whatsapp/message-sent` after a send it dispatched is acknowledged, so an outbound acknowledgement exists even for a provider that observes no echo of its own traffic.',
+    description: 'The WhatsApp access service. Registered as `ctx.whatsapp` (one instance per context).\n\nEvery operation resolves the provider at call time and rejects when the capability cannot run:\n\n- no provider registered → `WHATSAPP_PROVIDER_UNAVAILABLE`.\n- a registered provider whose account is not `online` → `WHATSAPP_NOT_ONLINE`.\n\nThe provider emits `whatsapp/status` and `whatsapp/message-received`; this service emits `whatsapp/message-sent` after a send it dispatched is acknowledged, so an outbound acknowledgement exists even for a provider that observes no echo of its own traffic.\n\nIt also remembers what it dispatched, so `claimOwnEcho` can tell the deployment\'s own answer coming back apart from the account writing from its paired phone.',
     methods: [
       {
         signature: 'register(provider: WhatsAppProvider): () => void',
@@ -2233,9 +2233,15 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: 'async send(request: WhatsAppSendRequest, signal?: AbortSignal): Promise<WhatsAppSentMessage>',
-        description: 'Send one text message and announce the acknowledgement on `whatsapp/message-sent`. A rejected send emits nothing.',
+        description: 'Send one text message and announce the acknowledgement on `whatsapp/message-sent`. A rejected send emits nothing.\n\nThe body is recorded as claimable before the provider is asked, because a provider that republishes the account\'s own traffic can publish this send\'s echo before this call returns; a record written afterwards would arrive behind the consumer that already routed it. The record survives a rejected send, since a send can fail after WhatsApp already relayed it.',
         parameters: [{ name: 'request', description: 'the target chat, the non-empty body, and an optional quoted message.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
         returns: 'the acknowledged message identity and send time.',
+      },
+      {
+        signature: 'claimOwnEcho(message: WhatsAppMessage): boolean',
+        description: 'Claim one observed message as the echo of a send this service dispatched.\n\nA provider republishes the account\'s own traffic, so a consumer that acts on what the account writes — the operator typing from the paired phone — has to drop the deployment\'s own answers coming back, which would otherwise wake the agent with its own words. A message the account did not write, and a body no dispatched send carries, are never claimed.\n\nThe claim is consumed: the first message matching a dispatched send answers `true`, and an identical message after it is the account writing that text itself.',
+        parameters: [{ name: 'message', description: 'the observed message, as the provider normalized it.' }],
+        returns: 'whether this message is a send this service dispatched.',
       },
       {
         signature: 'async resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAppChat>',

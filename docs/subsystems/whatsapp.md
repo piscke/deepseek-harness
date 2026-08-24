@@ -44,7 +44,7 @@ A category or single route means one session serves many conversations, so the c
 
 Inbound delivery never interrupts, and by default it never starts a turn either. A message arriving mid-turn waits and claims the agent's idle phase through the maintenance path; there it is injected as pending context, visible at the tail of the conversation and held until the operator's next prompt, which carries it into that request ahead of the prompt itself. Deployments answering without an operator set `inboundDelivery: turn` to get a follow-up turn per message instead. Model-visible ⟺ logged holds in the failing direction — `whatsapp/inbound` is appended before either delivery, so a message the log refuses never reaches the model, and the queue behind it keeps moving.
 
-The one thing the deployment never routes is the account's own messages. `fromMe` covers the operator typing on their phone as well as the harness's own answers echoed back; delivering either would wake the agent with words it already has. Everything else the seam publishes is something a person sent, so routing needs no other content judgment.
+The one thing the deployment never routes is its own answer coming back. `fromMe` covers two senders at once, so the seam records every send it dispatches and the router claims that echo before any policy runs; delivering it would wake the agent with words it already has. What the operator types on the paired phone is routed like any other message, which is how an account reaches its own harness and how a deployment is tried out without a second number. Everything else the seam publishes is something a person sent, so routing needs no other content judgment.
 
 ## Answering is a decision, per message
 
@@ -76,6 +76,8 @@ Every operation resolves the provider at call time and rejects when the capabili
 - a registered provider whose account is not `online` → `WHATSAPP_NOT_ONLINE`.
 
 The provider emits `whatsapp/status` and `whatsapp/message-received`; this service emits `whatsapp/message-sent` after a send it dispatched is acknowledged, so an outbound acknowledgement exists even for a provider that observes no echo of its own traffic.
+
+It also remembers what it dispatched, so `claimOwnEcho` can tell the deployment's own answer coming back apart from the account writing from its paired phone.
 
 ```ts cordis-catalog
 /**
@@ -111,11 +113,34 @@ async fetchMessages(request: WhatsAppHistoryRequest, signal?: AbortSignal): Prom
 /**
  * Send one text message and announce the acknowledgement on
  * `whatsapp/message-sent`. A rejected send emits nothing.
+ *
+ * The body is recorded as claimable before the provider is asked, because a
+ * provider that republishes the account's own traffic can publish this send's
+ * echo before this call returns; a record written afterwards would arrive
+ * behind the consumer that already routed it. The record survives a rejected
+ * send, since a send can fail after WhatsApp already relayed it.
  * @param request - the target chat, the non-empty body, and an optional quoted message.
  * @param signal - optional cancellation signal forwarded to the provider.
  * @returns the acknowledged message identity and send time.
  */
 async send(request: WhatsAppSendRequest, signal?: AbortSignal): Promise<WhatsAppSentMessage>
+
+/**
+ * Claim one observed message as the echo of a send this service dispatched.
+ *
+ * A provider republishes the account's own traffic, so a consumer that acts
+ * on what the account writes — the operator typing from the paired phone —
+ * has to drop the deployment's own answers coming back, which would otherwise
+ * wake the agent with its own words. A message the account did not write, and
+ * a body no dispatched send carries, are never claimed.
+ *
+ * The claim is consumed: the first message matching a dispatched send answers
+ * `true`, and an identical message after it is the account writing that text
+ * itself.
+ * @param message - the observed message, as the provider normalized it.
+ * @returns whether this message is a send this service dispatched.
+ */
+claimOwnEcho(message: WhatsAppMessage): boolean
 
 /**
  * Resolve one conversation address into the conversation it names.
@@ -140,7 +165,7 @@ async resolveChat(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<WhatsAp
 async markRead(chatId: WhatsAppChatId, signal?: AbortSignal): Promise<void>
 ```
 
-Source: [`packages/whatsapp/whatsapp/src/index.ts:62`](../../packages/whatsapp/whatsapp/src/index.ts)
+Source: [`packages/whatsapp/whatsapp/src/index.ts:79`](../../packages/whatsapp/whatsapp/src/index.ts)
 
 <a id="whatsapp-events"></a>
 

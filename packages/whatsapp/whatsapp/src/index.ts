@@ -18,8 +18,12 @@ import type {
   WhatsAppStatus,
 } from './types.ts'
 import { WhatsAppError } from './types.ts'
+import { OutboundEchoes } from './echoes.ts'
 import type { WhatsAppChatId } from './brand.ts'
 
+export {
+  OutboundEchoes,
+} from './echoes.ts'
 export {
   WhatsAppChatId,
   WhatsAppMessageId,
@@ -46,6 +50,15 @@ declare module '@deepseek-ai/cordis' {
 }
 
 /**
+ * How many dispatched sends stay claimable as echoes at once. This is a
+ * mechanism depth, not a deployment choice: it only has to exceed the sends
+ * whose echo has not been observed yet, and one send per approved tool call
+ * never approaches it. A provider that publishes no echo of its own traffic
+ * leaves its records to be evicted by the ones that follow.
+ */
+export const OUTBOUND_ECHO_RECALL = 64
+
+/**
  * The WhatsApp access service. Registered as `ctx.whatsapp` (one instance per
  * context).
  *
@@ -58,9 +71,14 @@ declare module '@deepseek-ai/cordis' {
  * service emits `whatsapp/message-sent` after a send it dispatched is
  * acknowledged, so an outbound acknowledgement exists even for a provider that
  * observes no echo of its own traffic.
+ *
+ * It also remembers what it dispatched, so `claimOwnEcho` can tell the
+ * deployment's own answer coming back apart from the account writing from its
+ * paired phone.
  */
 export class WhatsAppRuntime extends Service {
   private provider: WhatsAppProvider | undefined
+  private readonly echoes = new OutboundEchoes(OUTBOUND_ECHO_RECALL)
 
   constructor(ctx: Context) {
     super(ctx, 'whatsapp')
@@ -122,6 +140,12 @@ export class WhatsAppRuntime extends Service {
   /**
    * Send one text message and announce the acknowledgement on
    * `whatsapp/message-sent`. A rejected send emits nothing.
+   *
+   * The body is recorded as claimable before the provider is asked, because a
+   * provider that republishes the account's own traffic can publish this send's
+   * echo before this call returns; a record written afterwards would arrive
+   * behind the consumer that already routed it. The record survives a rejected
+   * send, since a send can fail after WhatsApp already relayed it.
    * @param request - the target chat, the non-empty body, and an optional quoted message.
    * @param signal - optional cancellation signal forwarded to the provider.
    * @returns the acknowledged message identity and send time.
@@ -130,9 +154,31 @@ export class WhatsAppRuntime extends Service {
     if (request.text.trim() === '') {
       throw new WhatsAppError('a WhatsApp message must carry text', 'WHATSAPP_EMPTY_MESSAGE')
     }
-    const sent = await this.requireOnline().send(request, signal)
+    const provider = this.requireOnline()
+    this.echoes.record(request.chatId, request.text)
+    const sent = await provider.send(request, signal)
     this.ctx.emit('whatsapp/message-sent', sent)
     return sent
+  }
+
+  /**
+   * Claim one observed message as the echo of a send this service dispatched.
+   *
+   * A provider republishes the account's own traffic, so a consumer that acts
+   * on what the account writes — the operator typing from the paired phone —
+   * has to drop the deployment's own answers coming back, which would otherwise
+   * wake the agent with its own words. A message the account did not write, and
+   * a body no dispatched send carries, are never claimed.
+   *
+   * The claim is consumed: the first message matching a dispatched send answers
+   * `true`, and an identical message after it is the account writing that text
+   * itself.
+   * @param message - the observed message, as the provider normalized it.
+   * @returns whether this message is a send this service dispatched.
+   */
+  claimOwnEcho(message: WhatsAppMessage): boolean {
+    if (!message.fromMe || message.content.kind !== 'text') return false
+    return this.echoes.claim(message.chatId, message.content.text)
   }
 
   /**

@@ -75,7 +75,11 @@ function provider(names: Record<string, string>): WhatsAppProvider {
       return Promise.resolve({ id: chatId, kind: 'direct', name, unreadCount: 0 } satisfies WhatsAppChat)
     },
     fetchMessages: () => Promise.resolve([]),
-    send: () => Promise.reject(new Error('sending is not part of this test')),
+    send: request => Promise.resolve({
+      id: WhatsAppMessageId('sent-1'),
+      chatId: request.chatId,
+      timestamp: '2026-08-21T10:00:05.000Z',
+    }),
     markRead: () => Promise.resolve(),
   }
 }
@@ -314,15 +318,24 @@ describe('the WhatsApp Workspace', () => {
     expect(agents.get(chatSessionId(groupId))?.logged()).toEqual(['M2'])
   })
 
-  it('delivers a replayed id once and never the account\'s own message', async () => {
+  it('delivers a replayed id once and the account\'s own message, but never the deployment\'s own send', async () => {
     const { ctx, agents } = await harness()
 
     ctx.emit('whatsapp/message-received', message('M1'))
     ctx.emit('whatsapp/message-received', message('M1'))
+    // The operator writing from the paired phone: the account is the author,
+    // and nothing in this deployment sent it.
     ctx.emit('whatsapp/message-received', message('M3', { fromMe: true }))
     await settle()
 
-    expect(agents.get(chatSessionId(anaId))?.logged()).toEqual(['M1'])
+    await ctx.whatsapp.send({ chatId: anaId, text: 'the agent answered this' })
+    ctx.emit('whatsapp/message-received', message('M4', {
+      fromMe: true,
+      content: { kind: 'text', text: 'the agent answered this' },
+    }))
+    await settle()
+
+    expect(agents.get(chatSessionId(anaId))?.logged()).toEqual(['M1', 'M3'])
   })
 
   it('drops a conversation the deployment filtered out', async () => {

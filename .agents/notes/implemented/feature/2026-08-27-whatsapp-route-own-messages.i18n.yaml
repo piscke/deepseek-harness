@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-27-whatsapp-route-own-messages.md
+2026-08-27-whatsapp-route-own-messages.md: 3e8f0bb75504f3a816de0db2dfd5243d436aa9a3
+2026-08-27-whatsapp-route-own-messages.zh.md: bf6a01267f3bec21e08fa193ed1f92e23163d040
