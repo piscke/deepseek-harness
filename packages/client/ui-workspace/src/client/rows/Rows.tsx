@@ -229,7 +229,7 @@ interface SessionStatus {
  * outranks completion reminders.
  */
 function sessionStatuses(
-  node: Pick<SessionNode, 'pendingInteraction' | 'running' | 'runningSubagentCount' | 'completed'>,
+  node: Pick<SessionNode, 'pendingInteraction' | 'running' | 'runningSubagentCount' | 'completed' | 'pendingContext'>,
   t: RowTranslate,
 ): readonly [SessionStatus, ...SessionStatus[]] {
   const subagents: SessionStatus | undefined = node.runningSubagentCount === 0
@@ -264,8 +264,25 @@ function sessionStatuses(
     return subagents === undefined ? [primary] : [primary, subagents]
   }
   if (subagents !== undefined) return [subagents]
+  // An arriving message the reader has not seen outranks the finished-run
+  // reminder: it is new material rather than an account of work already read.
+  if (node.pendingContext) return [{ state: 'done', label: t('status.newContext') }]
   if (node.completed) return [{ state: 'done', label: t('status.completed') }]
   return [{ state: 'done', label: t('status.idle') }]
+}
+
+/**
+ * Whether the row shows its status dot at all. Both green reminders share the
+ * `done` state with plain idle, which stays dotless.
+ * @param primary - the row's leading status.
+ * @param node - the row's reminder bits.
+ * @returns true when the dot is rendered.
+ */
+function showsStatus(
+  primary: SessionStatus,
+  node: Pick<SessionNode, 'completed' | 'pendingContext'>,
+): boolean {
+  return primary.state !== 'done' || node.completed || node.pendingContext
 }
 
 /** Primary status dot plus every status's screen-reader label, shared by the search and session rows. */
@@ -328,7 +345,7 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
     >
       <span className={css.searchResultHeading}>
         <span className={css.slot}>
-          {(primaryStatus.state !== 'done' || result.completed) && (
+          {showsStatus(primaryStatus, result) && (
             <SessionStatusDots statuses={statuses} />
           )}
         </span>
@@ -381,7 +398,7 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   const selected = node.id === currentId
   const statuses = sessionStatuses(node, t)
   const primaryStatus = statuses[0]
-  const showStatus = primaryStatus.state !== 'done' || row.completed
+  const showStatus = showsStatus(primaryStatus, row)
   const [menuOpen, setMenuOpen] = useState(false)
   // Archive hides the row through the registry-global archive set and never
   // touches the session log, so it is not styled as destructive and needs no

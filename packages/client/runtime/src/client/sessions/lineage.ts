@@ -33,6 +33,12 @@ export interface SessionListEntry {
   pendingInteraction?: PendingInteractionStatus
   /** Finished running while not selected and not yet opened — the sidebar's green "done" reminder (clears on select or the next run). */
   completed: boolean
+  /**
+   * Injected context arrived while this session was not selected — the
+   * sidebar's green "new context" reminder (clears on select or when the
+   * context is claimed).
+   */
+  pendingContext: boolean
   /** Lineage indent depth: root = 0; the UI just multiplies by the indent width. */
   depth: number
 }
@@ -44,12 +50,14 @@ export interface SessionListEntry {
  * @param summaries - the host's session.list items.
  * @param pendingInteractions - current manager-owned interaction status by session.
  * @param completed - sessions with a pending completion reminder (manager-owned live fact; absent = false).
+ * @param pendingContext - sessions holding unwatched injected context (manager-owned live fact; absent = false).
  * @returns display rows in render order.
  */
 export function flattenLineage(
   summaries: readonly TitledSessionSummary[],
   pendingInteractions?: ReadonlyMap<SessionId, PendingInteractionStatus>,
   completed?: ReadonlySet<SessionId>,
+  pendingContext?: ReadonlySet<SessionId>,
 ): SessionListEntry[] {
   const byId = new Map<SessionId, TitledSessionSummary>()
   for (const s of summaries) byId.set(s.sessionId, s)
@@ -79,6 +87,7 @@ export function flattenLineage(
       ...s,
       ...(pendingInteraction === undefined ? {} : { pendingInteraction }),
       completed: completed?.has(s.sessionId) ?? false,
+      pendingContext: pendingContext?.has(s.sessionId) ?? false,
       depth,
     })
     const kids = children.get(s.sessionId)

@@ -29,6 +29,8 @@ export interface SessionNode {
   runningSubagentCount: number
   /** Finished running while not selected and not yet opened (the green "done" reminder dot). */
   completed: boolean
+  /** Injected context arrived while this session was not selected (the green "new context" reminder dot). */
+  pendingContext: boolean
   updatedAt: number
 }
 
@@ -66,6 +68,8 @@ export interface SearchResultNode {
   runningSubagentCount: number
   /** Finished running while not selected and not yet opened (the green "done" reminder dot). */
   completed: boolean
+  /** Injected context arrived while this session was not selected (the green "new context" reminder dot). */
+  pendingContext: boolean
   snippet?: string
 }
 
@@ -222,6 +226,7 @@ function sessionNode(
     running: s.running,
     runningSubagentCount: descendants.get(s.id)?.runningCount ?? 0,
     completed: s.completed === true,
+    pendingContext: s.pendingContext === true,
     updatedAt: s.updatedAt,
     ...(s.pendingInteraction === undefined ? {} : { pendingInteraction: s.pendingInteraction }),
   }
@@ -385,6 +390,7 @@ export function deriveSearchResults(
           ? {}
           : { pendingInteraction: summary.pendingInteraction }),
         completed: summary.completed === true,
+        pendingContext: summary.pendingContext === true,
         ...match === undefined ? {} : { snippet: match.snippet },
       }
     }),
